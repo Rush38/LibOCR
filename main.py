@@ -146,11 +146,12 @@ def process_single_image(
             easy = result_data["confidence"]["easyocr"]
             tess = result_data["confidence"]["tesseract"]
             trocr = result_data["confidence"]["trocr"]
+            glm = result_data["confidence"]["glmocr"]
 
             if overall >= 0.6:
                 print_colored(
-                    f"[ OK ] {filename} — {elapsed:.1f}с "
-                    f"(E:{easy:.0%} T:{tess:.0%} Tr:{trocr:.0%} → {overall:.0%})",
+                    f"[ OK ] {filename} - {elapsed:.1f}s "
+                    f"(E:{easy:.0%} T:{tess:.0%} Tr:{trocr:.0%} G:{glm:.0%} -> {overall:.0%})",
                     Colors.GREEN,
                 )
             else:

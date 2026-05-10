@@ -41,10 +41,11 @@ class PostProcessor:
         easy_text = ocr_result.get("easyocr_text", "")
         tess_text = ocr_result.get("tesseract_text", "")
         trocr_text = ocr_result.get("trocr_text", "")
+        glm_text = ocr_result.get("glmocr_text", "")
 
-        raw_text = f"{tess_text}\n---\n{easy_text}\n---\n{trocr_text}"
+        raw_text = f"{tess_text}\n---\n{easy_text}\n---\n{trocr_text}\n---\n{glm_text}"
 
-        combined = easy_text + " " + tess_text + " " + trocr_text
+        combined = f"{easy_text} {tess_text} {trocr_text} {glm_text}"
 
         reader_names, possible_readers = self._extract_readers(combined)
         dates, possible_dates = self._extract_dates(raw_text)
@@ -76,12 +77,14 @@ class PostProcessor:
                 "easyocr_text": easy_text,
                 "tesseract_text": tess_text,
                 "trocr_text": trocr_text,
+                "glmocr_text": glm_text,
             },
             "confidence": {
                 "overall": float(ocr_result.get("overall_conf", 0.0)),
                 "easyocr": float(ocr_result.get("easyocr_conf", 0.0)),
                 "tesseract": float(ocr_result.get("tesseract_conf", 0.0)),
                 "trocr": float(ocr_result.get("trocr_conf", 0.0)),
+                "glmocr": float(ocr_result.get("glmocr_conf", 0.0)),
             },
             "warnings": ocr_result.get("warnings", []),
             "language": language,

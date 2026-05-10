@@ -12,7 +12,7 @@
 - **Russian language** support
 - **Python 3.11+** compatible
 
-## OCR Engines (3 движка)
+## OCR Engines (4 движка)
 
 ### EasyOCR
 - Печатный текст, русский/английский
@@ -32,6 +32,14 @@
 - Lazy-loaded, GPU-auto (cuda если доступна)
 - Timeout x2 относительно других движков
 - Загружается через `VisionEncoderDecoderModel` + `TrOCRProcessor`
+- **Local model support**: модель скачивается в `models/` через `snapshot_download`, используется локально без повторной загрузки
+
+### GLM-OCR (HuggingFace, optional local)
+- Модель: `zai-org/GLM-OCR` или аналогичная Vision-OCR модель с HuggingFace
+- Скачивается в `models/` при первом использовании
+- Используется как 4-й OCR движок для повышения accuracy
+- Lazy-loaded, GPU-auto (cuda если доступна)
+- Конфигурируется в `config.json` -> `ocr.glmocr`
 
 ## Dictionary System
 
@@ -143,7 +151,7 @@ Also produces:
 - [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, `error_reports/`, `~/.cache/huggingface/`
 
 ## Key Decisions
-- Hybrid OCR: EasyOCR + Tesseract + TrOCR (parallel ThreadPoolExecutor, 3 workers)
+- Hybrid OCR: EasyOCR + Tesseract + TrOCR + GLM-OCR (parallel ThreadPoolExecutor, 4 workers)
 - TrOCR: `Kansallisarkisto/cyrillic-large-handwritten` — CER=4%, 0.6B, Apache 2.0, lazy-loaded, GPU-auto
 - Postprocessor marks doubtful items but NEVER deletes from `raw_text`
 - Dictionary: `library_terms[]` + `fuzzy_corrections[]` from `dictionaries/library_dictionary.json`

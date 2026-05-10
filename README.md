@@ -11,20 +11,16 @@
 
 ## Архитектура
 
-Три движка OCR работают параллельно:
+Four OCR engines run in parallel:
 
-| Движок | Назначение | Модель | Confident |
-|--------|------------|--------|-----------|
-| **EasyOCR** | Печатный текст, русский/английский | easyocr Reader | из OCR |
-| **Tesseract** | Печатный текст, гибкая настройка PSM/OEM | tesseract.exe | средняя по символам |
-| **TrOCR** | Рукописный текст | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | ~92% |
+| Engine | Purpose | Model | Conf |
+|--------|---------|-------|------|
+| **EasyOCR** | Printed ru/en | easyocr Reader | per-bbox |
+| **Tesseract** | Printed, flexible PSM/OEM | tesseract.exe | avg per-char |
+| **TrOCR** | Handwritten text | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | ~92% |
+| **GLM-OCR** | Vision OCR, extra accuracy | `zai-org/GLM-OCR` (HuggingFace) | ~88% |
 
-**Третий движок: TrOCR**
-- HuggingFace: `Kansallisarkisto/cyrillic-large-handwritten`
-- CER = 4.06% на тесте русской рукописи
-- 0.6B параметров, Apache 2.0
-- Lazy-loaded (загружается при первом распознавании, не при импорте)
-- GPU-auto: CUDA используется если доступна
+All HuggingFace models support **local download**: models cached in `models/` via `snapshot_download`, reused without re-downloading.
 
 ## Словарь
 
@@ -88,7 +84,14 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
     "trocr": {
       "enabled": true,
       "model_name": "Kansallisarkisto/cyrillic-large-handwritten",
-      "device": "auto"
+      "device": "auto",
+      "local_models_dir": "models"
+    },
+    "glmocr": {
+      "enabled": true,
+      "model_name": "zai-org/GLM-OCR",
+      "device": "auto",
+      "local_models_dir": "models"
     }
   },
   "preprocessing": {
@@ -142,7 +145,7 @@ python main.py --single photo.jpg
 ```
 LibOCR/
 ├── main.py                    — точка входа, CLI
-├── ocr_engine.py              — 3 движка: EasyOCR + Tesseract + TrOCR
+├── ocr_engine.py              — 4 engines: EasyOCR + Tesseract + TrOCR + GLM-OCR
 ├── image_processor.py         — preprocessing: углы, CLAHE, линии, штампы
 ├── postprocessor.py           — разбор: имена, даты, номера, штампы
 ├── batch_state.py             — resume/reset state
@@ -188,13 +191,15 @@ LibOCR/
   "alternatives": {
     "easyocr_text": "...",
     "tesseract_text": "...",
-    "trocr_text": "..."
+    "trocr_text": "...",
+    "glmocr_text": "..."
   },
   "confidence": {
     "overall": 0.87,
     "easyocr": 0.82,
     "tesseract": 0.91,
-    "trocr": 0.92
+    "trocr": 0.92,
+    "glmocr": 0.88
   },
   "warnings": [],
   "language": "ru",

@@ -26,7 +26,14 @@
       "enabled": true,
       "model_name": "Kansallisarkisto/cyrillic-large-handwritten",
       "device": "auto",
-      "stride": 128
+      "stride": 128,
+      "local_models_dir": "models"
+    },
+    "glmocr": {
+      "enabled": true,
+      "model_name": "zai-org/GLM-OCR",
+      "device": "auto",
+      "local_models_dir": "models"
     }
   },
   "preprocessing": {

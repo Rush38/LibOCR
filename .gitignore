@@ -32,6 +32,9 @@ Thumbs.db
 ~/.cache/huggingface/
 .huggingface/
 
+# Local HuggingFace models
+models/
+
 # Batch state
 .batch_state.json
 
