@@ -16,6 +16,7 @@ from utils import (
     Colors,
     memory_cleanup,
     get_project_root,
+    save_error_report,
 )
 from batch_state import load_batch_state, save_batch_state
 
@@ -178,6 +179,7 @@ def process_single_image(
             else:
                 print_colored(f"[FAIL] {filename} — {str(e)}", Colors.RED)
                 logger.error(f"[{filename}] {str(e)}")
+                save_error_report(img_path, str(e), config)
                 return {
                     "file": filename,
                     "detected_angle": "",

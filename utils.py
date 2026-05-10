@@ -205,3 +205,29 @@ def log_message(level, filename, message, logger=None):
             "ERROR": logger.error,
         }.get(level.upper(), logger.info)
         log_func(f"[{filename}] {message}")
+
+
+def save_error_report(img_path, error_message, config):
+    error_dir = get_project_root() / config["paths"].get("error_reports_dir", "error_reports")
+    error_dir.mkdir(parents=True, exist_ok=True)
+
+    from datetime import datetime
+
+    stem = img_path.stem if img_path else "unknown"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = error_dir / f"{stem}_{timestamp}_error.txt"
+
+    lines = []
+    lines.append("=" * 60)
+    lines.append(f"ОШИБКА ОБРАБОТКИ")
+    lines.append("=" * 60)
+    lines.append(f"Файл:     {img_path.name if img_path else 'unknown'}")
+    lines.append(f"Путь:     {str(img_path) if img_path else 'unknown'}")
+    lines.append(f"Время:    {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"Ошибка:   {error_message}")
+    lines.append("=" * 60)
+
+    with open(report_path, "w", encoding="utf-8-sig") as f:
+        f.write("\n".join(lines))
+
+    return report_path

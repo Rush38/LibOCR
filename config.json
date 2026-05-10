@@ -3,7 +3,8 @@
     "input_dir": "input_images",
     "output_dir": "output_texts",
     "log_dir": "logs",
-    "debug_dir": "debug"
+    "debug_dir": "debug",
+    "error_reports_dir": "error_reports"
   },
   "ocr": {
     "easyocr": {

@@ -50,6 +50,11 @@
 - `--single F`  — обработать один файл
 - `--retry N`   — число повторов при ошибке
 
+## Error Tracking
+- При ошибке файл изображения копируется в `error_reports/<filename>_<timestamp>_error.txt`
+- Содержит: имя файла, путь, timestamp, текст ошибки
+- Позволяет повторно обработать проблемные файлы
+
 ## Preprocessing Pipeline
 1. Denoise (`fastNlMeansDenoisingColored`)
 2. Angle correction (Hough lines, max deviation 45°)
@@ -66,7 +71,7 @@ LibOCR/
 ├── image_processor.py         — preprocessing pipeline
 ├── postprocessor.py           — text parsing (names, dates, numbers, stamps)
 ├── batch_state.py             — resume/reset state management
-├── utils.py                   — logging, I/O, memory cleanup
+├── utils.py                   — logging, I/O, memory cleanup, error reports
 ├── dictionaries/
 │   ├── library_dictionary.json — библиотечные и литературные термины
 │   └── dictionary_loader.py    — загрузчик, fuzzy-поиск, Levenshtein
@@ -75,7 +80,7 @@ LibOCR/
 ├── run.bat                   — Windows launcher
 ├── install.ps1               — PowerShell installer
 ├── README.md                 — documentation
-├── .gitignore                — no venv, logs, output_texts, debug/, HuggingFace cache
+├── .gitignore                — no venv, logs, output_texts, debug/, error_reports/, HuggingFace cache
 └── agents.md / claude.md      — agent instructions & product rules
 ```
 
@@ -125,10 +130,11 @@ Also produces:
 - [ ] All 3 OCR engines (EasyOCR, Tesseract, TrOCR) integrated
 - [ ] Dictionary is loaded via `DictionaryLoader` singleton
 - [ ] TrOCR uses `VisionEncoderDecoderModel` + `TrOCRProcessor` from `Kansallisarkisto/cyrillic-large-handwritten`
+- [ ] Error tracking saves to `error_reports/`
 - [ ] Python files pass `python -m py_compile`
 - [ ] Working tree is clean (`git status --short`)
 - [ ] No secrets/keys in code
-- [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, `~/.cache/huggingface/`
+- [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, `error_reports/`, `~/.cache/huggingface/`
 
 ## Key Decisions
 - Hybrid OCR: EasyOCR + Tesseract + TrOCR (parallel ThreadPoolExecutor, 3 workers)
@@ -142,3 +148,4 @@ Also produces:
 - Batch state saved to `.batch_state.json` for resume support
 - Retry up to `config.processing.retry` times with `retry_delay`
 - Always call `memory_cleanup()` after each image
+- Error reports saved to `error_reports/` on failure

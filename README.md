@@ -167,6 +167,9 @@ LibOCR/
 - **`<имя>.txt`** — человекочитаемый отчёт
 - **`summary_report.csv`** — сводная таблица
 
+При ошибке в `error_reports/`:
+- **`<filename>_<timestamp>_error.txt`** — отчёт с именем файла, путём и текстом ошибки
+
 ### JSON-поля
 
 ```json
