@@ -162,6 +162,7 @@ def process_single_image(
                     result_data["inventory_numbers"]
                 ),
                 "possible_stamps": "|".join(result_data["possible_stamps"]),
+                "library_terms": "|".join(result_data.get("library_terms", [])),
                 "confidence": f"{overall:.0%}",
                 "language": result_data["language"],
                 "warnings": "|".join(result_data["warnings"]),
@@ -303,13 +304,14 @@ def main():
         f.write(
             "file;detected_angle;corrected;reader_names;dates;"
             "possible_dates;inventory_numbers;possible_stamps;"
-            "confidence;language;warnings\n"
+            "library_terms;confidence;language;warnings\n"
         )
         for r in results:
             f.write(
                 f"{r['file']};{r['detected_angle']};{r['corrected']};"
                 f"{r['reader_names']};{r['dates']};{r['possible_dates']};"
                 f"{r['inventory_numbers']};{r['possible_stamps']};"
+                f"{r.get('library_terms', '')};"
                 f"{r['confidence']};{r['language']};{r['warnings']}\n"
             )
 

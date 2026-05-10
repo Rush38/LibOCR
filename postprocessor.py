@@ -1,10 +1,10 @@
 import re
 from datetime import datetime
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 
 class PostProcessor:
-    def __init__(self):
+    def __init__(self, dict_loader=None):
         self._reader_pattern = re.compile(
             r"[А-Я][а-я]{2,}(?:[-\s][А-Я][а-я]+)?\s+[А-Я]\.[А-Я]\.?"
         )
@@ -21,6 +21,15 @@ class PostProcessor:
             r"\b([A-Za-z]{2,3}[-./]?[0-9]{4,8})\b"
         )
         self._inv_pattern3 = re.compile(r"\b([0-9]{4,8})\b")
+
+        if dict_loader is None:
+            from dictionaries.dictionary_loader import DictionaryLoader
+            try:
+                self._dict = DictionaryLoader()
+            except Exception:
+                self._dict = None
+        else:
+            self._dict = dict_loader
 
     def process(
         self,
@@ -41,6 +50,7 @@ class PostProcessor:
         inventory_numbers = self._extract_inventory_numbers(raw_text)
         possible_stamps = self._extract_stamps(raw_text)
         possible_noise = self._extract_noise(raw_text)
+        library_terms = self._dictionary_lookup(raw_text)
 
         language = self._detect_language(raw_text)
 
@@ -57,6 +67,7 @@ class PostProcessor:
             "inventory_numbers": inventory_numbers,
             "possible_stamps": possible_stamps,
             "possible_noise": possible_noise,
+            "library_terms": library_terms,
             "raw_text": raw_text,
             "alternatives": {
                 "easyocr_text": easy_text,
@@ -194,3 +205,9 @@ class PostProcessor:
         elif cyrillic > 0 or latin > 0:
             return "mixed"
         return "unknown"
+
+    def _dictionary_lookup(self, text: str) -> List[str]:
+        if not self._dict:
+            return []
+        results = self._dict.match_patterns(text, max_edit_distance=1)
+        return [r["dictionary"] for r in results]

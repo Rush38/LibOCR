@@ -144,6 +144,7 @@ def save_txt_output(path, data):
     _section("НОМЕРА:", data.get("inventory_numbers", []))
     _section("ШТАМПЫ:", data.get("possible_stamps", []))
     _section("ШУМ:", data.get("possible_noise", []))
+    _section("БИБЛИОТЕЧНЫЕ ТЕРМИНЫ:", data.get("library_terms", []))
 
     lines.append(sep)
     lines.append("ПОЛНЫЙ ТЕКСТ (raw_text):")
