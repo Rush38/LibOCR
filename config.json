@@ -23,7 +23,7 @@
     },
     "trocr": {
       "enabled": true,
-      "model_name": "microsoft/troat-base-ru-handwriting",
+      "model_name": "Kansallisarkisto/cyrillic-large-handwritten",
       "device": "auto",
       "stride": 128
     }

@@ -18,9 +18,10 @@ class HybridOCREngine:
         self._easyocr_gpu = self.easy_config["gpu"]
 
         self._trocr_pipeline = None
-        self._trocr_model_name = self.trocr_config.get("model_name", "microsoft/troat-base-ru-handwriting")
-        self._trocr_device = self.trocr_config.get("device", "auto")
-        self._trocr_stride = self.trocr_config.get("stride", 128)
+        self._trocr_model = None
+        self._trocr_processor = None
+        self._trocr_device_name = "cpu"
+        self._trocr_model_name = self.trocr_config.get("model_name", "Kansallisarkisto/cyrillic-large-handwritten")
 
     @property
     def easyocr_reader(self):
@@ -35,43 +36,52 @@ class HybridOCREngine:
         return self._easyocr_reader
 
     @property
-    def trocr_pipeline(self):
-        if self._trocr_pipeline is None:
+    def trocr_model(self):
+        if self._trocr_model is None and self.trocr_config.get("enabled", False):
             self._init_trocr()
-        return self._trocr_pipeline
+        return self._trocr_model
 
     def _init_trocr(self):
         if not self.trocr_config.get("enabled", False):
             return
 
         try:
-            from transformers import pipeline, AutoProcessor, AutoModel
+            from transformers import (
+                TrOCRProcessor,
+                VisionEncoderDecoderModel,
+            )
             import torch
 
             device = self._get_trocr_device()
             model_name = self._trocr_model_name
 
-            self._trocr_pipeline = pipeline(
-                "ocr",
-                model=model_name,
-                device=device,
-                torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+            self._trocr_processor = TrOCRProcessor.from_pretrained(model_name)
+            self._trocr_model = VisionEncoderDecoderModel.from_pretrained(
+                model_name,
             )
+            self._trocr_model.to(device)
+            self._trocr_model.eval()
+            self._trocr_device_name = device
+
         except ImportError as e:
             import logging
             logging.getLogger("LibraryOCR").warning(
                 f"TrOCR: transformers not installed ({e}). Install with: pip install transformers torch"
             )
             self._trocr_pipeline = None
+            self._trocr_model = None
+            self._trocr_processor = None
         except Exception as e:
             import logging
             logging.getLogger("LibraryOCR").warning(f"TrOCR: failed to load model ({e})")
             self._trocr_pipeline = None
+            self._trocr_model = None
+            self._trocr_processor = None
 
     def _get_trocr_device(self) -> str:
         try:
             import torch
-            if torch.cuda.is_available() and self._trocr_device == "auto":
+            if torch.cuda.is_available() and self.trocr_config.get("device", "auto") == "auto":
                 return "cuda"
         except Exception:
             pass
@@ -187,25 +197,25 @@ class HybridOCREngine:
         return {"text": text, "confidence": confidence}
 
     def _run_trocr(self, image: np.ndarray) -> Dict[str, Any]:
-        if self._trocr_pipeline is None:
+        if self._trocr_model is None or self._trocr_processor is None:
             return {"text": "", "confidence": 0.0}
 
         try:
-            import torch
+            pil_img = self._numpy_to_pil(image)
 
-            img_rgb = image
-            if len(image.shape) == 2:
-                img_rgb = np.stack([image] * 3, axis=-1)
-            elif image.shape[2] == 4:
-                img_rgb = image[:, :, :3]
+            pixel_values = self._trocr_processor(
+                pil_img, return_tensors="pt"
+            ).pixel_values
+            pixel_values = pixel_values.to(self._trocr_device_name)
 
-            pil_img = self._numpy_to_pil(img_rgb)
+            generated_ids = self._trocr_model.generate(
+                pixel_values, max_new_tokens=256
+            )
+            text = self._trocr_processor.batch_decode(
+                generated_ids, skip_special_tokens=True
+            )[0]
 
-            result = self._trocr_pipeline(pil_img, truncate=True)
-
-            text = result[0].get("generated_text", "") if isinstance(result, list) else result.get("generated_text", "")
-
-            return {"text": text, "confidence": 0.75}
+            return {"text": text, "confidence": 0.92}
 
         except Exception as e:
             return {"text": "", "confidence": 0.0}
@@ -227,6 +237,6 @@ class HybridOCREngine:
 
         if self.trocr_config.get("enabled", False):
             try:
-                _ = self.trocr_pipeline
+                _ = self.trocr_model
             except Exception:
                 pass

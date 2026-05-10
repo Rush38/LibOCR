@@ -62,7 +62,7 @@ LibOCR/
 
 ## Key Decisions
 - Hybrid OCR: EasyOCR + Tesseract + TrOCR (parallel ThreadPoolExecutor, 3 workers)
-- TrOCR: `microsoft/troat-base-ru-handwriting` from HuggingFace, lazy-loaded, GPU-auto
+- TrOCR: `Kansallisarkisto/cyrillic-large-handwritten` from HuggingFace (National Archives of Finland), Apache 2.0, CER=4%, Russian handwriting, lazy-loaded, GPU-auto
 - Postprocessor marks doubtful items but NEVER deletes from `raw_text`
 - Dictionary: `library_terms[]` + `fuzzy_corrections[]` from `dictionaries/library_dictionary.json`
 - Fuzzy-поиск: расстояние Левенштейна ≤ 1
