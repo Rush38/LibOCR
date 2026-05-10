@@ -1,90 +1,92 @@
 @echo off
 chcp 65001 > nul
 
-set "ROOT=%~dp0"
-set "IN="
-set "DBG="
-set "RES="
+set ROOT=%~dp0
+set IN=
+set DBG=
+set RES=
 
-if "%~1"=="" goto :run
-if "%~1"=="--check" goto :check
-if "%~1"=="--help" goto :help
-if "%~1"=="-h" goto :help
-if "%~1"=="--auto" set "IN=%ROOT%input_images"
-if "%~1"=="--debug" set "DBG=--debug"
-if "%~1"=="--resume" set "RES=--resume"
-if "%~1"=="--reset" set "RES=--reset"
-if "%~1"=="--input" set "IN=%~2"
-goto :run
+if "%~1"=="" goto run
+if "%~1"=="--check" goto check
+if "%~1"=="--help" goto help
+if "%~1"=="-h" goto help
+if "%~1"=="--auto" set IN=%ROOT%input_images
+if "%~1"=="--debug" set DBG=--debug
+if "%~1"=="--resume" set RES=--resume
+if "%~1"=="--reset" set RES=--reset
+if "%~1"=="--input" set IN=%~2
+goto run
 
 :run
 where python >nul 2>nul
 if errorlevel 1 (
-    echo [FAIL] Python не найден. Запустите install.ps1 от имени администратора.
+    echo [FAIL] Python not found. Run install.ps1 as administrator.
     pause
     exit /b 1
 )
 
-if not defined IN set "IN=%ROOT%input_images"
+if not defined IN set IN=%ROOT%input_images
 
-set "MAIN=%ROOT%main.py"
-if not exist "%MAIN%" (
-    echo [FAIL] main.py не найден.
+if not exist "%ROOT%main.py" (
+    echo [FAIL] main.py not found.
     pause
     exit /b 1
 )
+
 if not exist "%IN%" (
-    echo [FAIL] Папка не найдена: %IN%
+    echo [FAIL] Folder not found: %IN%
     pause
     exit /b 1
 )
 
 echo.
-echo Запуск LibOCR...
-echo Вход: %IN%
+echo LibOCR starting...
+echo Input: %IN%
 echo.
 
-python "%MAIN%" --input "%IN%" %DBG% %RES%
+python "%ROOT%main.py" --input "%IN%" %DBG% %RES%
 
 if errorlevel 1 (
     echo.
-    echo [FAIL] Ошибка обработки. Проверьте logs\ocr.log
+    echo [FAIL] Processing error. Check logs\ocr.log
     pause
     exit /b 1
 )
 
 echo.
-echo [OK] Готово! Результаты в output_texts
+echo [OK] Done! Results in output_texts
 pause
 exit /b 0
 
 :check
 where python >nul 2>nul
 if not errorlevel 1 (
-    echo [OK] Python найден:
+    echo [OK] Python found:
     python --version
 ) else (
-    echo [FAIL] Python не найден
+    echo [FAIL] Python not found
 )
 if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
-    echo [OK] Tesseract найден
+    echo [OK] Tesseract found
 ) else (
-    echo [FAIL] Tesseract не найден
+    echo [FAIL] Tesseract not found
 )
 echo.
-echo run.bat             - обработать input_images
-echo run.bat --debug     - режим отладки
-echo run.bat --check     - проверка системы
-echo run.bat --help      - справка
+echo Usage:
+echo   run.bat              - process input_images
+echo   run.bat --debug      - debug mode
+echo   run.bat --check      - system check
+echo   run.bat --help       - help
 pause
 exit /b 0
 
 :help
-echo LibOCR - OCR для библиотечных карточек
+echo LibOCR - OCR for library cards
 echo.
-echo run.bat             - обработать input_images
-echo run.bat --debug     - режим отладки
-echo run.bat --check     - проверка системы
-echo run.bat --help      - справка
+echo Usage:
+echo   run.bat              - process input_images
+echo   run.bat --debug      - debug mode
+echo   run.bat --check      - system check
+echo   run.bat --help       - help
 pause
 exit /b 0

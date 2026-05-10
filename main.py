@@ -198,19 +198,29 @@ def process_single_image(
 
 def main():
     try:
+        from datetime import datetime
+        log_dir = get_project_root() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        run_log = log_dir / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(run_log, "w", encoding="utf-8") as rf:
+            rf.write(f"LibOCR run started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    except Exception:
+        pass
+
+    try:
         args = parse_arguments()
         config = load_config()
         logger = setup_logging(config)
     except Exception as e:
         import sys
         from pathlib import Path
+        from datetime import datetime
 
         print(f"[FAIL] {e}")
         try:
             log_dir = Path(__file__).parent / "logs"
             log_dir.mkdir(exist_ok=True)
             with open(log_dir / "ocr.log", "w", encoding="utf-8") as f:
-                from datetime import datetime
                 f.write(f"[{datetime.now()}] [ERROR] [main] {e}\n")
         except Exception:
             pass
@@ -342,9 +352,18 @@ def main():
         Colors.GREEN if err_count == 0 else Colors.YELLOW,
     )
     print_colored(
-        "Результаты в " + str(output_dir.relative_to(root)),
+        "Results in " + str(output_dir.relative_to(root)),
         Colors.BLUE,
     )
+
+    try:
+        with open(run_log, "a", encoding="utf-8") as rf:
+            from datetime import datetime
+            rf.write(f"Run finished at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            rf.write(f"Processed: {ok_count}/{len(images)}, errors: {err_count}, time: {total_elapsed:.1f}s\n")
+            rf.write(f"Results: {output_dir.relative_to(root)}\n")
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
