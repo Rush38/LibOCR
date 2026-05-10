@@ -19,7 +19,8 @@ shift & goto :parse_args
 :run
 where python >nul 2>nul
 if errorlevel 1 (
-    echo [FAIL] Python не найден. Запустите install.ps1
+    echo [FAIL] Python не найден.
+    echo Запустите install.ps1 от имени администратора
     pause
     exit /b 1
 )
@@ -41,20 +42,19 @@ if not exist "%IN%" (
 echo.
 echo [....] Запуск LibOCR...
 echo     Вход:  %IN%
-echo    Debug: %DBG%
 echo.
 
 python "%MAIN%" --input "%IN%" %DBG%
 
 if errorlevel 1 (
     echo.
-    echo [FAIL] Ошибка. Проверьте logs\ocr.log
+    echo [FAIL] Ошибка обработки. Проверьте logs\ocr.log
     pause
     exit /b 1
 )
 
 echo.
-echo [ OK ] Готово!
+echo [ OK ] Готово! Результаты в output_texts\
 pause
 exit /b 0
 

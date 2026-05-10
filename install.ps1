@@ -59,6 +59,8 @@ foreach ($dir in $dirs) {
 $pythonExe = Join-Path $PythonInstallDir "python.exe"
 $pipExe = Join-Path $PythonInstallDir "Scripts\pip.exe"
 
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
 if (Test-Path $pythonExe) {
     Write-ColorOutput "[ OK ] Python уже установлен в libraries" "Green"
 }
@@ -73,18 +75,25 @@ else {
     $installerPath = Join-Path $tempDir $PythonInstaller
 
     if (Download-WithRetry -Url $PythonUrl -OutputPath $installerPath -Description "Python $PythonVersion") {
-        Write-ColorOutput "[....] Установка Python..." "Cyan"
-
-        $proc = Start-Process -FilePath $installerPath `
-            -ArgumentList "/quiet", "InstallAllUsers=0", "TargetDir=$PythonInstallDir", `
-                        "Include_pip=1", "Include_test=0", "PrependPath=1" `
-            -Wait -PassThru -NoNewWindow
-
-        if ($proc.ExitCode -ne 0) {
-            Write-ColorOutput "[WARN] Автоматическая установка не удалась" "Yellow"
+        if (-not $isAdmin) {
+            Write-ColorOutput "[WARN] Установка Python требует прав администратора" "Yellow"
+            Write-ColorOutput "  Установите Python вручную: https://www.python.org/downloads/" "Yellow"
+            Write-ColorOutput "  Или запустите PowerShell от имени администратора" "Yellow"
         }
         else {
-            Write-ColorOutput "[ OK ] Python установлен" "Green"
+            Write-ColorOutput "[....] Установка Python..." "Cyan"
+
+            $proc = Start-Process -FilePath $installerPath `
+                -ArgumentList "/quiet", "InstallAllUsers=0", "TargetDir=$PythonInstallDir", `
+                            "Include_pip=1", "Include_test=0", "PrependPath=1" `
+                -Wait -PassThru -NoNewWindow
+
+            if ($proc.ExitCode -ne 0) {
+                Write-ColorOutput "[WARN] Автоматическая установка не удалась" "Yellow"
+            }
+            else {
+                Write-ColorOutput "[ OK ] Python установлен" "Green"
+            }
         }
     }
 }
@@ -107,6 +116,9 @@ if (Test-Path $pythonExe) {
         }
     }
 }
+else {
+    Write-ColorOutput "[FAIL] Python не найден. Установите вручную." "Red"
+}
 
 $tesseractExe = Join-Path $TesseractInstallDir "tesseract.exe"
 
@@ -114,26 +126,33 @@ if (Test-Path $tesseractExe) {
     Write-ColorOutput "[ OK ] Tesseract уже установлен" "Green"
 }
 else {
-    Write-ColorOutput "[....] Установка Tesseract..." "Cyan"
+    if (-not $isAdmin) {
+        Write-ColorOutput "[WARN] Установка Tesseract требует прав администратора" "Yellow"
+        Write-ColorOutput "  Скачайте вручную: https://github.com/UB-Mannheim/tesseract/releases" "Yellow"
+        Write-ColorOutput "  Или запустите PowerShell от имени администратора" "Yellow"
+    }
+    else {
+        Write-ColorOutput "[....] Установка Tesseract..." "Cyan"
 
-    $tempDir = Join-Path $ScriptDir "temp_install"
-    $tesseractInstallerPath = Join-Path $tempDir "tesseract-installer.exe"
+        $tempDir = Join-Path $ScriptDir "temp_install"
+        $tesseractInstallerPath = Join-Path $tempDir "tesseract-installer.exe"
 
-    if (Download-WithRetry -Url $TesseractUrl -OutFile $tesseractInstallerPath -Description "Tesseract") {
-        Write-ColorOutput "[....] Запуск установщика Tesseract..." "Cyan"
+        if (Download-WithRetry -Url $TesseractUrl -OutFile $tesseractInstallerPath -Description "Tesseract") {
+            Write-ColorOutput "[....] Запуск установщика Tesseract..." "Cyan"
 
-        $proc = Start-Process -FilePath $tesseractInstallerPath `
-            -ArgumentList "/SILENT", "/NORESTART" `
-            -Wait -PassThru -NoNewWindow
+            $proc = Start-Process -FilePath $tesseractInstallerPath `
+                -ArgumentList "/SILENT", "/NORESTART" `
+                -Wait -PassThru -NoNewWindow
 
-        Start-Sleep -Seconds 5
+            Start-Sleep -Seconds 5
 
-        if (Test-Path $tesseractExe) {
-            Write-ColorOutput "[ OK ] Tesseract установлен" "Green"
-        }
-        else {
-            Write-ColorOutput "[WARN] Tesseract не установился автоматически" "Yellow"
-            Write-ColorOutput "  Скачайте вручную: https://github.com/UB-Mannheim/tesseract/releases" "Yellow"
+            if (Test-Path $tesseractExe) {
+                Write-ColorOutput "[ OK ] Tesseract установлен" "Green"
+            }
+            else {
+                Write-ColorOutput "[WARN] Tesseract не установился автоматически" "Yellow"
+                Write-ColorOutput "  Скачайте вручную: https://github.com/UB-Mannheim/tesseract/releases" "Yellow"
+            }
         }
     }
 }
@@ -148,11 +167,21 @@ else {
 
     $tessdataDir = Join-Path $TesseractInstallDir "tessdata"
     if (-not (Test-Path $tessdataDir)) {
-        New-Item -ItemType Directory -Force -Path $tessdataDir | Out-Null
+        if ($isAdmin) {
+            New-Item -ItemType Directory -Force -Path $tessdataDir | Out-Null
+        }
+        else {
+            Write-ColorOutput "[WARN] Нет прав для создания tessdata. Скачайте rus.traineddata вручную." "Yellow"
+        }
     }
 
-    if (Download-WithRetry -Url $TessdataUrl -OutputPath $tessdataPath -Description "rus.traineddata") {
-        Write-ColorOutput "[ OK ] rus.traineddata скачан" "Green"
+    if (Test-Path $tessdataDir) {
+        if (Download-WithRetry -Url $TessdataUrl -OutputPath $tessdataPath -Description "rus.traineddata") {
+            Write-ColorOutput "[ OK ] rus.traineddata скачан" "Green"
+        }
+    }
+    else {
+        Write-ColorOutput "[WARN] rus.traineddata не скачан. Скачайте вручную в папку tessdata." "Yellow"
     }
 }
 
