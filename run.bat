@@ -11,6 +11,8 @@ if "%~1"=="" goto :run
 if "%~1"=="--auto" set "IN=%ROOT%input_images" & shift & goto :parse_args
 if "%~1"=="--input" set "IN=%~2" & shift & shift & goto :parse_args
 if "%~1"=="--debug" set "DBG=--debug" & shift & goto :parse_args
+if "%~1"=="--resume" set "RES=--resume" & shift & goto :parse_args
+if "%~1"=="--reset" set "RES=--reset" & shift & goto :parse_args
 if "%~1"=="--check" goto :check
 if "%~1"=="--help" goto :help
 if "%~1"=="-h" goto :help
@@ -44,7 +46,7 @@ echo [....] Запуск LibOCR...
 echo     Вход:  %IN%
 echo.
 
-python "%MAIN%" --input "%IN%" %DBG%
+python "%MAIN%" --input "%IN%" %DBG% %RES%
 
 if errorlevel 1 (
     echo.
@@ -73,22 +75,26 @@ if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
 )
 echo.
 echo Использование:
-echo   run.bat              — интерактивный режим
-echo   run.bat --auto       — обработать input_images
-echo   run.bat --debug      — режим отладки
-echo   run.bat --input path — указать папку
-echo   run.bat --check      — проверка системы
-echo   run.bat --resume     — продолжить batch
-echo   run.bat --reset      — сбросить batch
+echo   run.bat               — обработать input_images
+echo   run.bat --auto        — обработать input_images
+echo   run.bat --debug       — режим отладки
+echo   run.bat --input path  — указать папку
+echo   run.bat --resume      — продолжить batch
+echo   run.bat --reset       — сбросить batch
+echo   run.bat --check       — проверка системы
+echo   run.bat --help        — эта справка
 exit /b 0
 
 :help
-echo LibOCR — OCR для библиотечных карточек
+echo LibOCR - OCR для библиотечных карточек
 echo.
 echo Использование:
-echo   run.bat              — интерактивный режим
-echo   run.bat --auto       — обработать input_images
-echo   run.bat --debug      — режим отладки
-echo   run.bat --input path  — указать папку
-echo   run.bat --check      — проверка системы
+echo   run.bat               — обработать input_images
+echo   run.bat --auto        — обработать input_images
+echo   run.bat --debug       — режим отладки
+echo   run.bat --input path   — указать папку
+echo   run.bat --resume       — продолжить batch
+echo   run.bat --reset       — сбросить batch
+echo   run.bat --check       — проверка системы
+echo   run.bat --help        — эта справка
 exit /b 0
