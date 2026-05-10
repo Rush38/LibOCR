@@ -1,31 +1,24 @@
 @echo off
 chcp 65001 > nul
-setlocal
 
 set "ROOT=%~dp0"
 set "IN="
 set "DBG="
 set "RES="
 
+call :parse_args %*
+goto :run
+
 :parse_args
-if "%~1"=="" goto :run
-if "%~1"=="--auto" set "IN=%ROOT%input_images" & goto :next_arg
-if "%~1"=="--input" set "IN=%~2" & goto :next_arg2
-if "%~1"=="--debug" set "DBG=--debug" & goto :next_arg
-if "%~1"=="--resume" set "RES=--resume" & goto :next_arg
-if "%~1"=="--reset" set "RES=--reset" & goto :next_arg
+if "%~1"=="" exit /b 0
+if "%~1"=="--auto" set "IN=%ROOT%input_images" & exit /b 0
+if "%~1"=="--input" set "IN=%~2" & exit /b 0
+if "%~1"=="--debug" set "DBG=--debug" & exit /b 0
+if "%~1"=="--resume" set "RES=--resume" & exit /b 0
+if "%~1"=="--reset" set "RES=--reset" & exit /b 0
 if "%~1"=="--check" goto :check
 if "%~1"=="--help" goto :help
 if "%~1"=="-h" goto :help
-shift
-goto :parse_args
-
-:next_arg
-shift
-goto :parse_args
-
-:next_arg2
-shift
 shift
 goto :parse_args
 
@@ -48,6 +41,7 @@ if not exist "%MAIN%" (
     pause
     exit /b 1
 )
+
 if not exist "%IN%" (
     echo [FAIL] Папка не найдена: %IN%
     echo.
@@ -61,14 +55,13 @@ echo     Вход: %IN%
 echo.
 
 python "%MAIN%" --input "%IN%" %DBG% %RES%
-set "PY_EXIT=%errorlevel%"
 
-if %PY_EXIT% neq 0 (
+if errorlevel 1 (
     echo.
     echo [FAIL] Ошибка обработки. Проверьте logs\ocr.log
     echo.
     pause
-    exit /b %PY_EXIT%
+    exit /b 1
 )
 
 echo.
@@ -92,14 +85,10 @@ if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
 )
 echo.
 echo Использование:
-echo   run.bat              - обработать input_images
-echo   run.bat --auto       - обработать input_images
-echo   run.bat --debug      - режим отладки
-echo   run.bat --input path - указать папку
-echo   run.bat --resume      - продолжить batch
-echo   run.bat --reset      - сбросить batch
-echo   run.bat --check      - проверка системы
-echo   run.bat --help       - эта справка
+echo   run.bat               - обработать input_images
+echo   run.bat --debug       - режим отладки
+echo   run.bat --check       - проверка системы
+echo   run.bat --help        - эта справка
 echo.
 pause
 exit /b 0
@@ -108,14 +97,10 @@ exit /b 0
 echo LibOCR - OCR для библиотечных карточек
 echo.
 echo Использование:
-echo   run.bat              - обработать input_images
-echo   run.bat --auto       - обработать input_images
-echo   run.bat --debug      - режим отладки
-echo   run.bat --input path - указать папку
-echo   run.bat --resume      - продолжить batch
-echo   run.bat --reset      - сбросить batch
-echo   run.bat --check      - проверка системы
-echo   run.bat --help       - эта справка
+echo   run.bat               - обработать input_images
+echo   run.bat --debug       - режим отладки
+echo   run.bat --check       - проверка системы
+echo   run.bat --help        - эта справка
 echo.
 pause
 exit /b 0
