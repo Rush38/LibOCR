@@ -9,7 +9,7 @@ from tqdm import tqdm
 from utils import (
     load_config,
     setup_logging,
-    get_image_files,
+    get_all_image_files,
     save_json_output,
     save_txt_output,
     print_colored,
@@ -17,8 +17,9 @@ from utils import (
     memory_cleanup,
     get_project_root,
     save_error_report,
+    make_output_subdir,
 )
-from batch_state import load_batch_state, save_batch_state
+from batch_state import load_batch_state
 from image_processor import ImageProcessor
 from ocr_engine import HybridOCREngine
 from postprocessor import PostProcessor
@@ -77,6 +78,8 @@ def process_single_image(
     retry_delay=2,
 ):
     filename = img_path.name
+    json_path = make_output_subdir(img_path, input_dir, output_dir).with_suffix(".json")
+    txt_path = json_path.with_suffix(".txt")
     start_time = time.time()
 
     for attempt in range(max_retries):
@@ -255,17 +258,17 @@ def main():
     if args.single:
         single_path = input_dir / args.single
         if not single_path.exists():
-            print_colored(f"[FAIL] Файл не найден: {single_path}", Colors.RED)
+            print_colored(f"[FAIL] File not found: {single_path}", Colors.RED)
             return
         images = [single_path]
     else:
-        all_images = get_image_files(input_dir)
+        all_images = get_all_image_files(input_dir)
         if args.resume:
             images = batch_state.get_remaining(all_images)
             skipped = len(all_images) - len(images)
             if skipped > 0:
                 print_colored(
-                    f"[INFO] Пропуск {skipped} уже обработанных файлов", Colors.BLUE
+                    f"[INFO] Skipped {skipped} processed files", Colors.BLUE
                 )
         else:
             images = all_images

@@ -99,6 +99,33 @@ def get_image_files(directory):
     return sorted(files)
 
 
+def get_all_image_files(directory):
+    path = get_project_root() / directory
+    if not path.exists():
+        return []
+    extensions = ["jpg", "jpeg", "png", "webp", "bmp", "tiff", "tif"]
+    files = []
+    for ext in extensions:
+        for f in path.rglob(f"*.{ext}"):
+            if f.is_file():
+                files.append(f)
+        for f in path.rglob(f"*.{ext.upper()}"):
+            if f.is_file():
+                files.append(f)
+    return sorted(set(files))
+
+
+def get_relative_path(file_path, base_path):
+    return file_path.relative_to(base_path)
+
+
+def make_output_subdir(file_path, input_dir, output_dir):
+    rel = file_path.relative_to(input_dir)
+    out_file = output_dir / rel
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    return out_file
+
+
 def save_json_output(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8-sig") as f:
@@ -109,73 +136,25 @@ def save_txt_output(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = []
     sep = "=" * 60
-    sub = "-" * 60
 
     lines.append(sep)
-    lines.append(f"Файл:          {data.get('filename', 'unknown')}")
-    lines.append(f"Язык:          {data.get('language', 'unknown')}")
-    lines.append(f"Уверенность:   {data.get('confidence', {}).get('overall', 0):.0%}")
-    lines.append(
-        f"Время:          {data.get('processing_time_sec', 0):.1f} сек"
-    )
-    lines.append(
-        f"Движки:         EasyOCR ({data.get('confidence', {}).get('easyocr', 0):.0%}), "
-        f"Tesseract ({data.get('confidence', {}).get('tesseract', 0):.0%}), "
-        f"TrOCR ({data.get('confidence', {}).get('trocr', 0):.0%})"
-    )
+    lines.append(f"File: {data.get('filename', 'unknown')}")
+    lines.append(f"Language: {data.get('language', 'unknown')}")
+    lines.append(f"Confidence: {data.get('confidence', {}).get('overall', 0):.0%}")
+    lines.append(f"Time: {data.get('processing_time_sec', 0):.1f}s")
+    lines.append(f"Angle: {data.get('detected_angle', 0):.1f} deg, corrected: {data.get('corrected', False)}")
     lines.append(sep)
-    lines.append(
-        f"УГОЛ КОРРЕКЦИИ: исходный {data.get('detected_angle', 0):.1f}° → "
-        f"{'применена' if data.get('corrected') else 'не требуется'}"
-    )
+    lines.append("READERS:")
+    for name in data.get("reader_names", []):
+        lines.append(f"  {name}")
     lines.append(sep)
-
-    def _section(title, items):
-        lines.append(title)
-        if items:
-            for item in items:
-                lines.append(f"  • {item}")
-        else:
-            lines.append("  (не обнаружено)")
-
-    _section("ЧИТАТЕЛИ:", data.get("reader_names", []))
-    _section("ВОЗМОЖНЫЕ ЧИТАТЕЛИ:", data.get("possible_readers", []))
-    _section("ДАТЫ:", data.get("dates", []))
-    _section("ВОЗМОЖНЫЕ ДАТЫ:", data.get("possible_dates", []))
-    _section("НОМЕРА:", data.get("inventory_numbers", []))
-    _section("ШТАМПЫ:", data.get("possible_stamps", []))
-    _section("ШУМ:", data.get("possible_noise", []))
-    _section("БИБЛИОТЕЧНЫЕ ТЕРМИНЫ:", data.get("library_terms", []))
-    if data.get("fuzzy_corrections"):
-        lines.append("КОРРЕКТИРОВКИ СЛОВАРЯ:")
-        for fc in data["fuzzy_corrections"]:
-            lines.append(f"  • {fc['original']} → {fc['corrected']} (расстояние={fc['distance']})")
-
-    lines.append(sep)
-    lines.append("ПОЛНЫЙ ТЕКСТ (raw_text):")
-    lines.append(sub)
+    lines.append("TEXT:")
     lines.append(data.get("raw_text", ""))
-    lines.append(sub)
     lines.append(sep)
-    lines.append("АЛЬТЕРНАТИВЫ OCR:")
-    lines.append(
-        f"EasyOCR ({data.get('confidence', {}).get('easyocr', 0):.0%}): "
-        f"{data.get('alternatives', {}).get('easyocr_text', '')}"
-    )
-    lines.append(
-        f"Tesseract ({data.get('confidence', {}).get('tesseract', 0):.0%}): "
-        f"{data.get('alternatives', {}).get('tesseract_text', '')}"
-    )
-    lines.append(
-        f"TrOCR ({data.get('confidence', {}).get('trocr', 0):.0%}): "
-        f"{data.get('alternatives', {}).get('trocr_text', '')}"
-    )
-    lines.append(sep)
-
     if data.get("warnings"):
-        lines.append("ПРЕДУПРЕЖДЕНИЯ:")
+        lines.append("WARNINGS:")
         for warn in data["warnings"]:
-            lines.append(f"  • {warn}")
+            lines.append(f"  {warn}")
         lines.append(sep)
 
     with open(path, "w", encoding="utf-8-sig") as f:

@@ -50,6 +50,11 @@
 - `--single F`  — обработать один файл
 - `--retry N`   — число повторов при ошибке
 
+## Nested Images
+- Обрабатываются изображения во всех подпапках `input_images/` (рекурсивно)
+- Структура папок сохраняется: `input_images/subfolder/image.jpg` → `output_texts/subfolder/image.json`
+- Иерархия директорий воспроизводится в `output_texts/`
+
 ## Error Tracking
 - При ошибке файл изображения копируется в `error_reports/<filename>_<timestamp>_error.txt`
 - Содержит: имя файла, путь, timestamp, текст ошибки
@@ -131,6 +136,7 @@ Also produces:
 - [ ] Dictionary is loaded via `DictionaryLoader` singleton
 - [ ] TrOCR uses `VisionEncoderDecoderModel` + `TrOCRProcessor` from `Kansallisarkisto/cyrillic-large-handwritten`
 - [ ] Error tracking saves to `error_reports/`
+- [ ] Nested image paths preserved: `input_images/sub/name.jpg` → `output_texts/sub/name.json`
 - [ ] Python files pass `python -m py_compile`
 - [ ] Working tree is clean (`git status --short`)
 - [ ] No secrets/keys in code

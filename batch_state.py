@@ -53,5 +53,5 @@ def save_batch_state(output_dir: Path, state: BatchState):
 
 
 def load_batch_state(output_dir: Path) -> BatchState:
-    state_file = output_dir / ".batch_state.json"
+    state_file = Path(__file__).parent / ".batch_state.json"
     return BatchState(state_file)
