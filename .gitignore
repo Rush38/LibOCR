@@ -35,9 +35,6 @@ Thumbs.db
 # Batch state
 .batch_state.json
 
-# OCR models
-libraries/models/
-
 # Output (generated files)
 output_texts/
 logs/

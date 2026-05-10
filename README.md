@@ -7,142 +7,101 @@
 - Windows 10/11 (x64)
 - Python 3.11+
 - Tesseract OCR 5.3+
-- Видеокарта с CUDA (опционально, для ускорения EasyOCR)
+- GPU с CUDA (опционально, для EasyOCR и TrOCR)
+
+## Архитектура
+
+Три движка OCR работают параллельно:
+
+| Движок | Назначение | Модель | Confident |
+|--------|------------|--------|-----------|
+| **EasyOCR** | Печатный текст, русский/английский | easyocr Reader | из OCR |
+| **Tesseract** | Печатный текст, гибкая настройка PSM/OEM | tesseract.exe | средняя по символам |
+| **TrOCR** | Рукописный текст | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | ~92% |
+
+**Третий движок: TrOCR**
+- HuggingFace: `Kansallisarkisto/cyrillic-large-handwritten`
+- CER = 4.06% на тесте русской рукописи
+- 0.6B параметров, Apache 2.0
+- Lazy-loaded (загружается при первом распознавании, не при импорте)
+- GPU-auto: CUDA используется если доступна
+
+## Словарь
+
+Библиотечные и литературные термины загружаются из `dictionaries/library_dictionary.json`:
+
+| Категория | Примеры |
+|---|---|
+| `library_terms` | библиотека, абонемент, каталог, инвентарный |
+| `literary_terms` | проза, поэзия, роман, повесть |
+| `institutions` | библиотека, архив, издательство |
+| `document_types` | формуляр, читательский билет, каталог |
+| `person_titles` | библиотекарь, библиограф, хранитель |
+| `verification_markers` | требует проверки, неразборчиво |
+
+Fuzzy-поиск: расстояние Левенштейна ≤ 1.
 
 ## Установка
 
-### Автоматическая установка (рекомендуется)
+### Автоматическая (рекомендуется)
 
 1. Откройте PowerShell **от имени администратора**
-2. Перейдите в папку проекта:
-   ```
-   cd путь\к\LibOCR
-   ```
-3. Запустите установщик:
-   ```
-   .\install.ps1
-   ```
-4. Следуйте инструкциям на экране. Установщик:
-   - Скачает и установит Python 3.11 (в папку `libraries\`)
-   - Установит все зависимости
-   - Скачает и установит Tesseract OCR
-   - Скачает языковую модель `rus.traineddata`
-   - Проведёт тест OCR
+2. Перейдите в папку проекта: `cd путь\к\LibOCR`
+3. Запустите: `.\install.ps1`
 
-### Ручная установка
+Установщик скачает и установит Python, Tesseract OCR, языковую модель `rus.traineddata`, и все Python-библиотеки.
 
-1. Установите Python 3.11+ с [python.org](https://www.python.org/downloads/)
-2. Установите Tesseract OCR 5.3+ с [UB-Mannheim](https://github.com/UB-Mannheim/tesseract/releases)
-3. Скачайте `rus.traineddata` в папку `tessdata`:
-   ```
-   https://github.com/tesseract-ocr/tessdata_best/raw/main/rus.traineddata
-   ```
-4. Обновите путь к Tesseract в `config.json`:
-   ```json
-   "tesseract": {
-     "path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
-     ...
-   }
-   ```
-5. Установите зависимости:
-   ```
-   pip install -r requirements.txt
-   ```
+### Ручная
 
-## Использование
-
-### Быстрый старт
-
-Дважды кликните на **`run.bat`** — откроется интерактивный режим.
-
-### Режимы запуска
-
-```batch
-run.bat              — интерактивный режим (спросит папку)
-run.bat --auto       — обработать всё в input_images
-run.bat --debug      — режим отладки (сохраняет промежуточные изображения)
-run.bat --input path — указать папку вручную
-run.bat --check      — проверка системы (Python, Tesseract)
-run.bat --resume     — продолжить с места остановки
-run.bat --reset      — сбросить состояние batch
-```
-
-### Python напрямую
-
-```bash
-python main.py --input input_images
-python main.py --input photos --debug
-python main.py --input photos --single my_photo.jpg
-python main.py --input photos --resume
-```
-
-### Аргументы командной строки
-
-| Аргумент       | Описание                                             |
-|----------------|------------------------------------------------------|
-| `--input`      | Путь к папке с изображениями                         |
-| `--debug`      | Сохранять промежуточные изображения в `debug/`        |
-| `--retry N`    | Число повторов при ошибке (по умолчанию из config)    |
-| `--resume`     | Пропустить уже обработанные файлы                    |
-| `--reset`      | Сбросить состояние batch                             |
-| `--single F`   | Обработать один файл                                 |
-
-## Структура проекта
-
-```
-LibOCR/
-├── main.py              — точка входа
-├── ocr_engine.py        — движок OCR (EasyOCR + Tesseract)
-├── image_processor.py   — предобработка изображений
-├── postprocessor.py     — разбор текста (имена, даты, номера)
-├── batch_state.py       — управление состоянием batch
-├── utils.py             — утилиты (логирование, ввод/вывод)
-├── config.json          — конфигурация
-├── requirements.txt     — зависимости Python
-├── run.bat              — запуск (Windows)
-├── install.ps1          — установщик
-├── input_images/        — сюда положить изображения
-├── output_texts/        — результаты (JSON, TXT, CSV)
-├── logs/                — логи
-└── debug/               — отладочные изображения
-```
+1. Python 3.11+ с [python.org](https://www.python.org/downloads/)
+2. Tesseract OCR 5.3+ с [UB-Mannheim](https://github.com/UB-Mannheim/tesseract/releases)
+3. `rus.traineddata` → папка `tessdata` Tesseract
+4. `pip install -r requirements.txt`
+5. Обновите путь к Tesseract в `config.json` при необходимости
 
 ## Конфигурация
 
-Отредактируйте `config.json`:
+Все настройки — в `config.json`. Никаких hardcoded значений в коде.
 
 ```json
 {
   "paths": {
     "input_dir": "input_images",
-    "output_dir": "output_texts"
+    "output_dir": "output_texts",
+    "log_dir": "logs",
+    "debug_dir": "debug"
   },
   "ocr": {
     "easyocr": {
+      "enabled": true,
       "languages": ["ru", "en"],
-      "gpu": true
+      "gpu": true,
+      "paragraph": true
     },
     "tesseract": {
+      "enabled": true,
       "path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
       "languages": "rus+eng",
+      "oem": 3,
       "psm": 6
+    },
+    "trocr": {
+      "enabled": true,
+      "model_name": "Kansallisarkisto/cyrillic-large-handwritten",
+      "device": "auto"
     }
   },
   "preprocessing": {
-    "clahe": {
-      "clip_limit": 2.0,
-      "tile_grid_size": [8, 8]
-    },
-    "line_removal": {
-      "h_thresh": 0.4,
-      "v_thresh": 0.3
-    },
+    "clahe": { "clip_limit": 2.0, "tile_grid_size": [8, 8] },
+    "line_removal": { "h_thresh": 0.4, "v_thresh": 0.3 },
     "stamp_suppression": {
       "hsv_ranges": [
         {"h": [100, 140], "s": [20, 255], "v": [20, 255]},
         {"h": [140, 170], "s": [20, 255], "v": [20, 255]}
-      ]
-    }
+      ],
+      "sat_reduction": 0.0
+    },
+    "angle_correction": { "max_deviation": 45.0 }
   },
   "processing": {
     "timeout_engine": 60,
@@ -152,80 +111,109 @@ LibOCR/
 }
 ```
 
-### Ключевые параметры
+## Использование
 
-| Параметр                      | По умолчанию | Описание                                |
-|-------------------------------|--------------|----------------------------------------|
-| `easyocr.gpu`                 | `true`       | Использовать GPU для EasyOCR            |
-| `easyocr.languages`            | `["ru","en"]`| Языки EasyOCR                           |
-| `tesseract.psm`                | `6`          | Режим сегментации Tesseract             |
-| `preprocessing.clahe.clip_limit` | `2.0`      | Контрастность CLAHE                     |
-| `preprocessing.line_removal.*` | разное       | Пороги удаления линий                    |
-| `processing.timeout_engine`    | `60` сек     | Таймаут на один движок OCR              |
-| `processing.retry`            | `3`          | Число повторов при ошибке               |
+```batch
+run.bat                — интерактивный режим
+run.bat --auto         — обработать всё в input_images
+run.bat --debug        — сохранять промежуточные изображения
+run.bat --input path   — указать папку
+run.bat --check        — проверка системы
+run.bat --resume       — продолжить batch
+run.bat --reset        — сбросить batch
+
+python main.py --input photos --debug --resume
+python main.py --single photo.jpg
+```
+
+### Все CLI-флаги
+
+| Флаг | Описание |
+|------|----------|
+| `--input` | Путь к папке с изображениями |
+| `--debug` | Сохранять промежуточные изображения в `debug/` |
+| `--resume` | Пропустить уже обработанные файлы |
+| `--reset` | Сбросить состояние batch |
+| `--single F` | Обработать один файл |
+| `--retry N` | Число повторов при ошибке |
+
+## Структура проекта
+
+```
+LibOCR/
+├── main.py                    — точка входа, CLI
+├── ocr_engine.py              — 3 движка: EasyOCR + Tesseract + TrOCR
+├── image_processor.py         — preprocessing: углы, CLAHE, линии, штампы
+├── postprocessor.py           — разбор: имена, даты, номера, штампы
+├── batch_state.py             — resume/reset state
+├── utils.py                   — логирование, I/O, memory cleanup
+├── dictionaries/
+│   ├── library_dictionary.json — библиотечные термины
+│   └── dictionary_loader.py   — fuzzy-поиск, Levenshtein
+├── config.json               — вся конфигурация
+├── requirements.txt           — зависимости
+├── run.bat                    — запуск (Windows)
+├── install.ps1                — установщик
+├── README.md                  — эта документация
+├── agents.md                  — правила продукта
+└── claude.md                  — инструкции для Claude Code
+```
 
 ## Результаты
 
-После обработки в `output_texts/` создаются файлы:
+После обработки в `output_texts/`:
 
-- **`<имя>.json`** — полная структура с `raw_text`, `confidence`, `warnings`
+- **`<имя>.json`** — полная структура
 - **`<имя>.txt`** — человекочитаемый отчёт
-- **`summary_report.csv`** — сводная таблица всех файлов
+- **`summary_report.csv`** — сводная таблица
 
-### Поля JSON
+### JSON-поля
 
 ```json
 {
-  "filename": "...",
+  "filename": "photo.jpg",
   "reader_names": ["Иванов А.Б."],
   "dates": ["15.03.2024"],
   "possible_dates": ["12.06.19 — требует проверки"],
   "inventory_numbers": ["№ СП-12345"],
   "possible_stamps": ["ШАНС"],
+  "library_terms": ["библиотека", "читатель"],
+  "fuzzy_corrections": [
+    {"original": "боблиотека", "corrected": "библиотека", "distance": 1}
+  ],
   "raw_text": "полный текст без удалений",
   "alternatives": {
     "easyocr_text": "...",
-    "tesseract_text": "..."
+    "tesseract_text": "...",
+    "trocr_text": "..."
   },
   "confidence": {
     "overall": 0.87,
     "easyocr": 0.82,
-    "tesseract": 0.91
+    "tesseract": 0.91,
+    "trocr": 0.92
   },
-  "warnings": ["EasyOCR: превышен таймаут"],
-  "language": "ru"
+  "warnings": [],
+  "language": "ru",
+  "detected_angle": 3.5,
+  "corrected": true,
+  "processing_time_sec": 12.5
 }
 ```
 
 ### Важно: `raw_text` не редактируется
 
-Всё, что распознано — сохраняется в `raw_text` без изменений и удалений. Сомнительные элементы помечаются в отдельных полях как `possible_*` и снабжаются пометкой `— требует проверки`.
+Всё распознанное сохраняется в `raw_text` без изменений. Сомнительные элементы → отдельные поля `possible_*` с пометкой `— требует проверки`.
 
 ## Решение проблем
 
-### Python не найден
-
-Запустите `install.ps1` от имени администратора.
-
-### Tesseract не найден
-
-Установите вручную: https://github.com/UB-Mannheim/tesseract/releases
-Обновите путь в `config.json`.
-
-### Низкая точность распознавания
-
-1. Используйте `--debug` для сохранения промежуточных изображений
-2. Улучшите фото: хорошее освещение, минимум тени
-3. Настройте `preprocessing` в `config.json`
-4. Для русской рукописной text попробуйте EasyOCR отдельно
-
-### CUDA out of memory
-
-Установите `easyocr.gpu: false` в `config.json`.
-
-### Превышен таймаут
-
-Увеличьте `processing.timeout_engine` в `config.json`.
+| Проблема | Решение |
+|----------|---------|
+| Python не найден | `.\install.ps1` от администратора |
+| Tesseract не найден | Установить вручную, обновить путь в `config.json` |
+| CUDA OOM | `easyocr.gpu: false` в `config.json` |
+| Низкая точность | `--debug` → смотреть `debug/` |
+| Timeout | Увеличить `processing.timeout_engine` в `config.json` |
 
 ## Лицензия
 
