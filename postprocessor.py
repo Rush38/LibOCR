@@ -51,6 +51,7 @@ class PostProcessor:
         possible_stamps = self._extract_stamps(raw_text)
         possible_noise = self._extract_noise(raw_text)
         library_terms = self._dictionary_lookup(raw_text)
+        fuzzy_corrections = self._fuzzy_corrections(raw_text)
 
         language = self._detect_language(raw_text)
 
@@ -68,6 +69,7 @@ class PostProcessor:
             "possible_stamps": possible_stamps,
             "possible_noise": possible_noise,
             "library_terms": library_terms,
+            "fuzzy_corrections": fuzzy_corrections,
             "raw_text": raw_text,
             "alternatives": {
                 "easyocr_text": easy_text,
@@ -210,4 +212,9 @@ class PostProcessor:
         if not self._dict:
             return []
         results = self._dict.match_patterns(text, max_edit_distance=1)
-        return [r["dictionary"] for r in results]
+        return list({r["corrected"] for r in results})
+
+    def _fuzzy_corrections(self, text: str) -> List[Dict]:
+        if not self._dict:
+            return []
+        return self._dict.match_patterns(text, max_edit_distance=1)

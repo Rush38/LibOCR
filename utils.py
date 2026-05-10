@@ -145,6 +145,10 @@ def save_txt_output(path, data):
     _section("ШТАМПЫ:", data.get("possible_stamps", []))
     _section("ШУМ:", data.get("possible_noise", []))
     _section("БИБЛИОТЕЧНЫЕ ТЕРМИНЫ:", data.get("library_terms", []))
+    if data.get("fuzzy_corrections"):
+        lines.append("КОРРЕКТИРОВКИ СЛОВАРЯ:")
+        for fc in data["fuzzy_corrections"]:
+            lines.append(f"  • {fc['original']} → {fc['corrected']} (расстояние={fc['distance']})")
 
     lines.append(sep)
     lines.append("ПОЛНЫЙ ТЕКСТ (raw_text):")

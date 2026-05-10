@@ -71,17 +71,44 @@ class DictionaryLoader:
 
         for word in words:
             word_lower = word.lower()
+            best = None
+            best_dist = max_edit_distance + 1
             for dict_word in all_dict_words:
-                if dict_word in word_lower or word_lower in dict_word:
-                    dist = self._levenshtein(word_lower, dict_word)
-                    if dist <= max_edit_distance:
-                        results.append({
-                            "found": word,
-                            "dictionary": dict_word,
-                            "distance": dist
-                        })
-                        break
+                dist = self._levenshtein(word_lower, dict_word)
+                if dist < best_dist:
+                    best_dist = dist
+                    best = dict_word
+            if best and best_dist <= max_edit_distance:
+                results.append({
+                    "original": word,
+                    "corrected": best,
+                    "distance": best_dist
+                })
         return results
+
+    def suggest_correction(self, word: str, max_distance: int = 1) -> List[Dict]:
+        word_lower = word.lower()
+        suggestions = []
+        all_dict_words = self.all_words()
+        for dict_word in all_dict_words:
+            dist = self._levenshtein(word_lower, dict_word)
+            if dist <= max_distance:
+                suggestions.append({
+                    "word": dict_word,
+                    "distance": dist
+                })
+        suggestions.sort(key=lambda x: (x["distance"], len(x["word"])))
+        return suggestions[:5]
+
+    def build_tesseract_wordlist(self) -> str:
+        words = set()
+        for w in self.all_words():
+            if len(w) >= 3:
+                words.add(w)
+        return "\n".join(sorted(words))
+
+    def get_category_words(self, category: str) -> List[str]:
+        return self._data.get(category, [])
 
     @staticmethod
     def _levenshtein(s1: str, s2: str) -> int:
