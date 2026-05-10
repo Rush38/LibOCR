@@ -19,6 +19,9 @@ from utils import (
     save_error_report,
 )
 from batch_state import load_batch_state, save_batch_state
+from image_processor import ImageProcessor
+from ocr_engine import HybridOCREngine
+from postprocessor import PostProcessor
 
 
 def parse_arguments():
