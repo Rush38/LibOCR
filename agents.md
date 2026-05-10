@@ -36,24 +36,41 @@ LibOCR/
 ├── run.bat              — Windows launcher
 ├── install.ps1          — PowerShell installer
 ├── README.md            — documentation
-├── .gitignore           — no venv, logs, output_texts, debug/
+├── dictionaries/        — library_terms + fuzzy_corrections
+│   ├── library_dictionary.json  — библиотечные и литературные термины
+│   └── dictionary_loader.py     — загрузчик, fuzzy-поиск, Levenshtein
+├── .gitignore           — no venv, logs, output_texts, debug/, HuggingFace cache
 └── agents.md / claude.md — agent instructions & product rules
 ```
 
-## Verification Checklist (check before each commit)
-- [ ] All paths use `pathlib` (no hardcoded absolute paths)
-- [ ] `config.json` values are loaded, not hardcoded in code
-- [ ] `raw_text` is never modified or deleted
-- [ ] `possible_*` fields exist for all extractors
-- [ ] `fuzzy_corrections[]` and `library_terms[]` from dictionary are present in results
-- [ ] TrOCR results appear in `alternatives.trocr_text` and `confidence.trocr`
-- [ ] All 3 OCR engines (EasyOCR, Tesseract, TrOCR) integrated and tested
-- [ ] Python files pass `python -m py_compile`
-- [ ] Working tree is clean (`git status --short`)
-- [ ] No secrets/keys in code
-- [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, HuggingFace cache `~/.cache/huggingface/`
+## CLI Flags
+- `--input`     — путь к папке изображений
+- `--debug`     — сохранять промежуточные изображения в debug/
+- `--resume`    — продолжить batch, пропустить обработанные
+- `--reset`     — сбросить состояние batch
+- `--single F`  — обработать один файл
+- `--retry N`   — число повторов при ошибке
+
+## Hard Constraints
+- Offline mode only — open-source движки (EasyOCR + Tesseract + TrOCR)
+- GPU capable with large models (2.5GB+)
+- Portability (flash drive compatible)
+- All paths relative via `pathlib`
+- `config.json` — loads and used, NOT hardcoded
+- Russian language support
+- Python 3.11+ compatible
+
+## Key Decisions
+- Hybrid OCR: EasyOCR + Tesseract + TrOCR (parallel ThreadPoolExecutor, 3 workers)
+- TrOCR: `microsoft/troat-base-ru-handwriting` from HuggingFace, lazy-loaded, GPU-auto
+- Postprocessor marks doubtful items but NEVER deletes from `raw_text`
+- Dictionary: `library_terms[]` + `fuzzy_corrections[]` from `dictionaries/library_dictionary.json`
+- Fuzzy-поиск: расстояние Левенштейна ≤ 1
+- `run.bat` uses system Python if available, else prompts for `install.ps1`
+- `install.ps1` handles full installation (Python + Tesseract + dependencies + transformers/torch)
+- `--resume` / `--reset` / `--single` / `--debug` flags for batch control
 
 ## Output Format
-- JSON: `filename`, `reader_names[]`, `dates[]`, `possible_dates[]`, `inventory_numbers[]`, `possible_stamps[]`, `raw_text` (complete, unedited), `alternatives{ easyocr_text, tesseract_text, trocr_text }`, `confidence{ overall, easyocr, tesseract, trocr }`, `warnings[]`, `language`, `detected_angle`, `corrected`, `processing_time_sec`
+- JSON: `filename`, `reader_names[]`, `dates[]`, `possible_dates[]`, `inventory_numbers[]`, `possible_stamps[]`, `raw_text` (complete, unedited), `alternatives{ easyocr_text, tesseract_text, trocr_text }`, `confidence{ overall, easyocr, tesseract, trocr }`, `warnings[]`, `language`, `detected_angle`, `corrected`, `processing_time_sec`, `library_terms[]`, `fuzzy_corrections[]`
 - TXT: human-readable report
 - CSV: `summary_report.csv` — one row per file
