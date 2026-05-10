@@ -197,10 +197,24 @@ def process_single_image(
 
 
 def main():
-    args = parse_arguments()
+    try:
+        args = parse_arguments()
+        config = load_config()
+        logger = setup_logging(config)
+    except Exception as e:
+        import sys
+        from pathlib import Path
 
-    config = load_config()
-    logger = setup_logging(config)
+        print(f"[FAIL] {e}")
+        try:
+            log_dir = Path(__file__).parent / "logs"
+            log_dir.mkdir(exist_ok=True)
+            with open(log_dir / "ocr.log", "w", encoding="utf-8") as f:
+                from datetime import datetime
+                f.write(f"[{datetime.now()}] [ERROR] [main] {e}\n")
+        except Exception:
+            pass
+        sys.exit(1)
 
     root = get_project_root()
 
