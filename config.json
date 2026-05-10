@@ -20,6 +20,12 @@
       "oem": 3,
       "psm": 6,
       "dpi": 300
+    },
+    "trocr": {
+      "enabled": true,
+      "model_name": "microsoft/troat-base-ru-handwriting",
+      "device": "auto",
+      "stride": 128
     }
   },
   "preprocessing": {

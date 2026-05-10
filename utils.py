@@ -120,7 +120,8 @@ def save_txt_output(path, data):
     )
     lines.append(
         f"Движки:         EasyOCR ({data.get('confidence', {}).get('easyocr', 0):.0%}), "
-        f"Tesseract ({data.get('confidence', {}).get('tesseract', 0):.0%})"
+        f"Tesseract ({data.get('confidence', {}).get('tesseract', 0):.0%}), "
+        f"TrOCR ({data.get('confidence', {}).get('trocr', 0):.0%})"
     )
     lines.append(sep)
     lines.append(
@@ -164,6 +165,10 @@ def save_txt_output(path, data):
     lines.append(
         f"Tesseract ({data.get('confidence', {}).get('tesseract', 0):.0%}): "
         f"{data.get('alternatives', {}).get('tesseract_text', '')}"
+    )
+    lines.append(
+        f"TrOCR ({data.get('confidence', {}).get('trocr', 0):.0%}): "
+        f"{data.get('alternatives', {}).get('trocr_text', '')}"
     )
     lines.append(sep)
 

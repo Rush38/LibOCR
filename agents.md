@@ -14,7 +14,9 @@
 
 ## Key Decisions
 - Hybrid OCR: EasyOCR + Tesseract (parallel ThreadPoolExecutor)
+- **Third OCR engine: TrOCR (HuggingFace)** для рукописного текста — загружается с `microsoft/troat-base-ru-handwriting` или аналога, offline via `transformers` + `torch`
 - Postprocessor marks doubtful items but NEVER deletes from `raw_text`
+- Dictionary-loaded: `library_terms[]` + `fuzzy_corrections[]` из `dictionaries/library_dictionary.json`
 - `run.bat` uses system Python if available, else prompts for `install.ps1`
 - `install.ps1` handles full installation (Python + Tesseract + dependencies)
 - `--resume` / `--reset` / `--single` flags for batch control
@@ -24,7 +26,7 @@
 ```
 LibOCR/
 ├── main.py              — entry point, CLI args
-├── ocr_engine.py        — EasyOCR + Tesseract hybrid engine
+├── ocr_engine.py        — EasyOCR + Tesseract + TrOCR hybrid engine
 ├── image_processor.py   — preprocessing pipeline
 ├── postprocessor.py    — text parsing (names, dates, numbers, stamps)
 ├── batch_state.py       — resume/reset state management
@@ -43,12 +45,15 @@ LibOCR/
 - [ ] `config.json` values are loaded, not hardcoded in code
 - [ ] `raw_text` is never modified or deleted
 - [ ] `possible_*` fields exist for all extractors
+- [ ] `fuzzy_corrections[]` and `library_terms[]` from dictionary are present in results
+- [ ] TrOCR results appear in `alternatives.trocr_text` and `confidence.trocr`
+- [ ] All 3 OCR engines (EasyOCR, Tesseract, TrOCR) integrated and tested
 - [ ] Python files pass `python -m py_compile`
 - [ ] Working tree is clean (`git status --short`)
 - [ ] No secrets/keys in code
-- [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`
+- [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, HuggingFace cache `~/.cache/huggingface/`
 
 ## Output Format
-- JSON: `filename`, `reader_names[]`, `dates[]`, `possible_dates[]`, `inventory_numbers[]`, `possible_stamps[]`, `raw_text` (complete, unedited), `alternatives{ easyocr_text, tesseract_text }`, `confidence{ overall, easyocr, tesseract }`, `warnings[]`, `language`, `detected_angle`, `corrected`, `processing_time_sec`
+- JSON: `filename`, `reader_names[]`, `dates[]`, `possible_dates[]`, `inventory_numbers[]`, `possible_stamps[]`, `raw_text` (complete, unedited), `alternatives{ easyocr_text, tesseract_text, trocr_text }`, `confidence{ overall, easyocr, tesseract, trocr }`, `warnings[]`, `language`, `detected_angle`, `corrected`, `processing_time_sec`
 - TXT: human-readable report
 - CSV: `summary_report.csv` — one row per file

@@ -40,10 +40,11 @@ class PostProcessor:
     ) -> Dict[str, Any]:
         easy_text = ocr_result.get("easyocr_text", "")
         tess_text = ocr_result.get("tesseract_text", "")
+        trocr_text = ocr_result.get("trocr_text", "")
 
-        raw_text = f"{tess_text}\n---\n{easy_text}"
+        raw_text = f"{tess_text}\n---\n{easy_text}\n---\n{trocr_text}"
 
-        combined = easy_text + " " + tess_text
+        combined = easy_text + " " + tess_text + " " + trocr_text
 
         reader_names, possible_readers = self._extract_readers(combined)
         dates, possible_dates = self._extract_dates(raw_text)
@@ -74,11 +75,13 @@ class PostProcessor:
             "alternatives": {
                 "easyocr_text": easy_text,
                 "tesseract_text": tess_text,
+                "trocr_text": trocr_text,
             },
             "confidence": {
                 "overall": float(ocr_result.get("overall_conf", 0.0)),
                 "easyocr": float(ocr_result.get("easyocr_conf", 0.0)),
                 "tesseract": float(ocr_result.get("tesseract_conf", 0.0)),
+                "trocr": float(ocr_result.get("trocr_conf", 0.0)),
             },
             "warnings": ocr_result.get("warnings", []),
             "language": language,

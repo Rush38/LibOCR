@@ -28,8 +28,15 @@ env/
 .DS_Store
 Thumbs.db
 
+# HuggingFace cache
+~/.cache/huggingface/
+.huggingface/
+
 # Batch state
 .batch_state.json
+
+# OCR models
+libraries/models/
 
 # Output (generated files)
 output_texts/
