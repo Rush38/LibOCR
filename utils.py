@@ -143,6 +143,8 @@ def save_txt_output(path, data):
 
     lines.append(sep)
     lines.append(f"File: {data.get('filename', 'unknown')}")
+    lines.append(f"Type: {data.get('text_type', 'unknown')}")
+    lines.append(f"Primary engine: {data.get('primary_engine', 'unknown')}")
     lines.append(f"Language: {data.get('language', 'unknown')}")
     lines.append(f"Confidence: {data.get('confidence', {}).get('overall', 0):.0%}")
     lines.append(f"Time: {data.get('processing_time_sec', 0):.1f}s")
@@ -151,10 +153,30 @@ def save_txt_output(path, data):
     lines.append("TEXT:")
     lines.append(data.get("raw_text", ""))
     lines.append(sep)
+    if data.get("library_terms"):
+        lines.append("LIBRARY TERMS:")
+        for t in data["library_terms"]:
+            lines.append(f"  - {t}")
+        lines.append(sep)
+    if data.get("possible_noise"):
+        lines.append("POSSIBLE NOISE:")
+        for n in data["possible_noise"]:
+            lines.append(f"  - {n}")
+        lines.append(sep)
+    if data.get("possible_errors"):
+        lines.append("POSSIBLE ERRORS:")
+        for e in data["possible_errors"]:
+            lines.append(f"  - {e}")
+        lines.append(sep)
     if data.get("warnings"):
         lines.append("WARNINGS:")
         for warn in data["warnings"]:
-            lines.append(f"  {warn}")
+            lines.append(f"  - {warn}")
+        lines.append(sep)
+    if data.get("fuzzy_corrections"):
+        lines.append("FUZZY CORRECTIONS:")
+        for fc in data["fuzzy_corrections"]:
+            lines.append(f"  {fc.get('original')} -> {fc.get('corrected')} (dist={fc.get('distance')})")
         lines.append(sep)
 
     with open(path, "w", encoding="utf-8-sig") as f:
@@ -171,20 +193,46 @@ def save_doc_output(path, data):
         font.name = "Arial"
         font.size = Pt(11)
 
-        doc.add_heading(f"LibOCR Result: {data.get('filename', 'unknown')}", 0)
-        p = doc.add_paragraph()
-        p.add_run("Language: ").bold = True
-        p.add_run(data.get("language", "unknown"))
-        p = doc.add_paragraph()
-        p.add_run("Confidence: ").bold = True
-        conf = data.get("confidence", {}).get("overall", 0)
-        p.add_run(f"{conf:.0%}")
-        p = doc.add_paragraph()
-        p.add_run("Time: ").bold = True
-        p.add_run(f"{data.get('processing_time_sec', 0):.1f}s")
+        doc.add_heading(f"LibOCR Result", 0)
+        doc.add_heading("Metadata", 1)
+        meta = [
+            ("File", data.get("filename", "unknown")),
+            ("Type", data.get("text_type", "unknown")),
+            ("Engine", data.get("primary_engine", "unknown")),
+            ("Language", data.get("language", "unknown")),
+            ("Confidence", f"{data.get('confidence', {}).get('overall', 0):.0%}"),
+            ("Time", f"{data.get('processing_time_sec', 0):.1f}s"),
+            ("Angle", f"{data.get('detected_angle', 0):.1f} deg"),
+        ]
+        for label, value in meta:
+            p = doc.add_paragraph()
+            p.add_run(f"{label}: ").bold = True
+            p.add_run(str(value))
 
         doc.add_heading("Text", 1)
         doc.add_paragraph(data.get("raw_text", ""))
+
+        if data.get("library_terms"):
+            doc.add_heading("Library Terms", 1)
+            for t in data["library_terms"]:
+                doc.add_paragraph(t, style="List Bullet")
+
+        if data.get("possible_noise"):
+            doc.add_heading("Possible Noise", 1)
+            for n in data["possible_noise"]:
+                doc.add_paragraph(n, style="List Bullet")
+
+        if data.get("possible_errors"):
+            doc.add_heading("Possible Errors", 1)
+            for e in data["possible_errors"]:
+                doc.add_paragraph(e, style="List Bullet")
+
+        if data.get("fuzzy_corrections"):
+            doc.add_heading("Fuzzy Corrections", 1)
+            for fc in data["fuzzy_corrections"]:
+                doc.add_paragraph(
+                    f"{fc.get('original')} \u2192 {fc.get('corrected')} (dist={fc.get('distance')})"
+                )
 
         if data.get("warnings"):
             doc.add_heading("Warnings", 1)
@@ -198,24 +246,40 @@ def save_doc_output(path, data):
 
 def save_md_output(path, data):
     sep = "---"
-    lines = [
+    parts = [
         f"# LibOCR Result: {data.get('filename', 'unknown')}",
         sep,
-        f"**Language:** {data.get('language', 'unknown')}",
-        f"**Confidence:** {data.get('confidence', {}).get('overall', 0):.0%}",
-        f"**Time:** {data.get('processing_time_sec', 0):.1f}s",
-        f"**Text type:** {data.get('text_type', 'unknown')}",
-        f"**Engine:** {data.get('primary_engine', 'unknown')}",
+        "## Metadata",
+        f"- **Type:** {data.get('text_type', 'unknown')}",
+        f"- **Primary engine:** {data.get('primary_engine', 'unknown')}",
+        f"- **Language:** {data.get('language', 'unknown')}",
+        f"- **Confidence:** {data.get('confidence', {}).get('overall', 0):.0%}",
+        f"- **Time:** {data.get('processing_time_sec', 0):.1f}s",
+        f"- **Angle:** {data.get('detected_angle', 0):.1f} deg",
+        f"- **Corrected:** {data.get('corrected', False)}",
         sep,
-        "## Raw Text",
+        "## Text",
         data.get("raw_text", ""),
     ]
+    if data.get("library_terms"):
+        parts += [sep, "## Library Terms"]
+        parts += [f"- {t}" for t in data["library_terms"]]
+    if data.get("possible_noise"):
+        parts += [sep, "## Possible Noise"]
+        parts += [f"- {n}" for n in data["possible_noise"]]
+    if data.get("possible_errors"):
+        parts += [sep, "## Possible Errors"]
+        parts += [f"- {e}" for e in data["possible_errors"]]
+    if data.get("fuzzy_corrections"):
+        parts += [sep, "## Fuzzy Corrections"]
+        for fc in data["fuzzy_corrections"]:
+            parts += [f"- {fc.get('original')} → {fc.get('corrected')} (dist={fc.get('distance')})"]
     if data.get("warnings"):
-        lines += [sep, "## Warnings"]
-        lines += [f"- {w}" for w in data["warnings"]]
+        parts += [sep, "## Warnings"]
+        parts += [f"- {w}" for w in data["warnings"]]
 
     with open(path, "w", encoding="utf-8") as f:
-        f.write("\n\n".join(lines))
+        f.write("\n\n".join(parts))
 
 
 def memory_cleanup():
