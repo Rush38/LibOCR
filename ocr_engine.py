@@ -139,11 +139,14 @@ class HybridOCREngine:
             logger = logging.getLogger("LibraryOCR")
             logger.info(f"TrOCR: loading model from {load_from}")
 
-            self._trocr_processor = TrOCRProcessor.from_pretrained(load_from)
+            self._trocr_processor = None
             self._trocr_model = VisionEncoderDecoderModel.from_pretrained(load_from)
             self._trocr_model.to(device)
             self._trocr_model.eval()
             self._trocr_model.generation_config.max_new_tokens = 256
+            from transformers import ViTImageProcessor, AutoTokenizer
+            self._trocr_image_processor = ViTImageProcessor.from_pretrained(load_from)
+            self._trocr_tokenizer = AutoTokenizer.from_pretrained(load_from)
             logger.info(f"TrOCR: model loaded successfully, device={device}")
             self._trocr_device_name = device
 
@@ -516,7 +519,7 @@ class HybridOCREngine:
         return {"text": text, "confidence": confidence, "psm_used": psm}
 
     def _run_trocr(self, image: np.ndarray) -> Dict[str, Any]:
-        if self._trocr_model is None or self._trocr_processor is None:
+        if self._trocr_model is None:
             return {"text": "", "confidence": 0.0, "error": "model not loaded"}
 
         import logging
@@ -527,24 +530,24 @@ class HybridOCREngine:
             from PIL import Image
             pil_img = Image.fromarray(image)
 
-            inputs = self._trocr_processor(
-                images=pil_img, return_tensors="pt"
-            )
+            image_processor = getattr(self, '_trocr_image_processor', None)
+            tokenizer = getattr(self, '_trocr_tokenizer', None)
+            if image_processor is None or tokenizer is None:
+                return {"text": "", "confidence": 0.0, "error": "TrOCR processor not initialized"}
 
+            pixel_values = image_processor(images=pil_img, return_tensors="pt").pixel_values
             device = getattr(self, '_trocr_device_name', 'cpu')
-            for key in inputs:
-                if hasattr(inputs[key], 'to'):
-                    inputs[key] = inputs[key].to(device)
+            pixel_values = pixel_values.to(device)
 
             with torch.no_grad():
                 generated_ids = self._trocr_model.generate(
-                    **inputs,
+                    pixel_values,
                     max_new_tokens=256,
                     num_beams=4,
                     early_stopping=True,
                 )
 
-            text = self._trocr_processor.batch_decode(
+            text = tokenizer.batch_decode(
                 generated_ids, skip_special_tokens=True
             )[0]
 
