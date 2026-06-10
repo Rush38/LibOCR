@@ -145,6 +145,17 @@ class HybridOCREngine:
             self._trocr_model.eval()
             self._trocr_model.generation_config.max_new_tokens = 256
             from transformers import ViTImageProcessor, AutoTokenizer
+            import json as _json
+            _fix_path = str(load_from)
+            _tok_cfg = _fix_path + "/tokenizer_config.json"
+            if Path(_tok_cfg).exists():
+                with open(_tok_cfg, "r", encoding="utf-8") as f:
+                    _cfg = _json.load(f)
+                if _cfg.get("tokenizer_class") == "TokenizersBackend":
+                    _cfg["tokenizer_class"] = "RobertaTokenizer"
+                    with open(_tok_cfg, "w", encoding="utf-8") as f:
+                        _json.dump(_cfg, f, ensure_ascii=False, indent=2)
+                    logger.info("TrOCR: fixed tokenizer_class TokenizersBackend -> RobertaTokenizer")
             self._trocr_image_processor = ViTImageProcessor.from_pretrained(load_from)
             self._trocr_tokenizer = AutoTokenizer.from_pretrained(load_from)
             logger.info(f"TrOCR: model loaded successfully, device={device}")
