@@ -22,6 +22,7 @@ set PYTHON_EXE=py
 py -3.12 -V >nul 2>nul
 if errorlevel 1 (
     set PYTHON_EXE=python
+    set PYTHON_ARGS=
     where python >nul 2>nul
     if errorlevel 1 (
         echo [FAIL] Python not found. Run install.ps1 as administrator.
@@ -30,6 +31,7 @@ if errorlevel 1 (
     )
     echo [WARN] Using system Python (GPU may not work)
 ) else (
+    set PYTHON_ARGS=-3.12
     echo [INFO] Using Python 3.12 (GPU support)
 )
 
@@ -56,13 +58,13 @@ echo Input: %IN%
 echo.
 
 echo [INFO] Проверка зависимостей...
-%PYTHON_EXE% -3.12 "%ROOT%main.py" --install 2>&1
+%PYTHON_EXE% %PYTHON_ARGS% "%ROOT%main.py" --install 2>&1
 if errorlevel 1 (
     echo [WARN] Установка зависимостей не удалась, продолжаем...
 )
 
 echo.
-%PYTHON_EXE% -3.12 "%ROOT%main.py" --input "%IN%" %DBG% %RES%
+%PYTHON_EXE% %PYTHON_ARGS% "%ROOT%main.py" --input "%IN%" %DBG% %RES%
 
 if errorlevel 1 (
     echo.
