@@ -20,6 +20,8 @@ from utils import (
     get_project_root,
     save_error_report,
     make_output_subdir,
+    tr,
+    TRANSLATE_LANG,
 )
 from batch_state import load_batch_state
 from image_processor import ImageProcessor
@@ -89,6 +91,13 @@ def parse_arguments():
         "--install",
         action="store_true",
         help="Установить все зависимости и дополнительные OCR движки",
+    )
+    parser.add_argument(
+        "--lang",
+        type=str,
+        default=None,
+        choices=["ru", "en"],
+        help="Язык интерфейса: ru (русский, по умолч.) или en (English)",
     )
     return parser.parse_args()
 
@@ -312,6 +321,33 @@ def main():
                 except Exception as e:
                     print_colored(f"  [WARN] {desc}: {e}", Colors.YELLOW)
 
+        print_colored("[INFO] Загрузка rus_old.traineddata...", Colors.BLUE)
+        import urllib.request
+        tessdata_dirs = [
+            Path("C:/Program Files/Tesseract-OCR/tessdata"),
+            Path("C:/Program Files (x86)/Tesseract-OCR/tessdata"),
+            get_project_root() / "tessdata",
+        ]
+        target_dir = None
+        for d in tessdata_dirs:
+            if d.exists():
+                target_dir = d
+                break
+        if not target_dir:
+            target_dir = tessdata_dirs[-1]
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+        url = "https://github.com/tesseract-ocr/tessdata/raw/main/rus_old.traineddata"
+        dest = target_dir / "rus_old.traineddata"
+        if not dest.exists():
+            try:
+                urllib.request.urlretrieve(url, dest)
+                print_colored(f"  [OK] rus_old.traineddata -> {dest}", Colors.GREEN)
+            except Exception as e:
+                print_colored(f"  [WARN] Не удалось загрузить rus_old: {e}", Colors.YELLOW)
+        else:
+            print_colored(f"  [OK] rus_old.traineddata уже есть", Colors.GREEN)
+
         print_colored("[OK] Установка завершена", Colors.GREEN)
         return
 
@@ -332,6 +368,10 @@ def main():
         output_format = args.format or config.get("output", {}).get("format", "txt")
         app_mode = args.mode or config.get("output", {}).get("mode", "library")
         num_workers = args.workers or config.get("processing", {}).get("max_workers", 1)
+        lang = args.lang or config.get("output", {}).get("lang", "ru")
+        TRANSLATE_LANG = lang
+        if lang == "en":
+            print_colored(f"[INFO] Interface language: English", Colors.BLUE)
     except Exception as e:
         import sys
         from pathlib import Path

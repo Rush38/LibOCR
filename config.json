@@ -95,6 +95,7 @@
     "max_log_mb": 10,
     "log_backups": 5,
     "format": "txt",
-    "mode": "library"
+    "mode": "library",
+    "lang": "ru"
   }
 }

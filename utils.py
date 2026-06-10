@@ -21,6 +21,52 @@ class Colors:
 
 
 CONFIG = None
+TRANSLATE_LANG = "ru"
+
+_TRANSLATIONS = {
+    "ru": {},
+    "en": {
+        "Установка зависимостей...": "Installing dependencies...",
+        "Установка": "Installing",
+        "установлен": "installed",
+        "Дополнительные OCR движки:": "Additional OCR engines:",
+        "Загрузка rus_old.traineddata...": "Downloading rus_old.traineddata...",
+        "Установка завершена": "Installation complete",
+        "Не удалось загрузить rus_old": "Failed to download rus_old",
+        "уже есть": "already exists",
+        "Не найдено": "Not found",
+        "Обработка": "Processing",
+        "файл": "file",
+        "сек": "sec",
+        "ошибок": "errors",
+        "Готово": "Done",
+        "обработано": "processed",
+        "Ошибка": "Error",
+        "терминов": "terms",
+        "Лучший": "Best",
+        "Всего": "Total",
+        "CUDA доступен": "CUDA available",
+        "CUDA не доступен": "CUDA not available",
+        "все движки работают на CPU": "all engines running on CPU",
+        "Состояние сброшено": "State reset",
+        "Статистика по типам текста:": "Statistics by text type:",
+        "Успешность по движкам:": "Success rate by engine:",
+        "файлов": "files",
+        "Результаты в": "Results in",
+        "Нет изображений в": "No images in",
+        "Пропущено": "Skipped",
+        "с существующими результатами": "with existing results",
+        "Найдено изображений": "Images found",
+        "низкая уверенность": "low confidence",
+        "проверьте результат": "check the result",
+    },
+}
+
+
+def tr(text):
+    if TRANSLATE_LANG == "en":
+        return _TRANSLATIONS["en"].get(text, text)
+    return text
 
 
 def get_project_root():
