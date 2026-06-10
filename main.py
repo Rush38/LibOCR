@@ -281,17 +281,24 @@ def main():
                 subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
                 print_colored(f"  [OK] {name} установлен", Colors.GREEN)
 
-        print_colored("[INFO] Дополнительные OCR движки (опционально):", Colors.BLUE)
+        print_colored("[INFO] Дополнительные OCR движки:", Colors.BLUE)
         extras = [
             ("paddleocr", "paddleocr", "PaddleOCR — высокая точность, свой DL-фреймворк"),
-            ("surya_ocr", "surya-ocr", "Surya OCR — современная архитектура"),
+            ("surya_ocr", "surya-ocr", "Surya OCR — современная архитектура на torch"),
         ]
         for mod_name, pip_name, desc in extras:
             try:
                 __import__(mod_name)
                 print_colored(f"  [OK] {desc}", Colors.GREEN)
             except ImportError:
-                print_colored(f"  [- ] {desc} — пропущен (pip install {pip_name})", Colors.GRAY)
+                print_colored(f"  [..] Установка {desc}...", Colors.YELLOW)
+                try:
+                    import subprocess, sys
+                    subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+                    print_colored(f"  [OK] {desc}", Colors.GREEN)
+                except Exception as e:
+                    print_colored(f"  [WARN] {desc}: {e}", Colors.YELLOW)
 
         print_colored("[OK] Установка завершена", Colors.GREEN)
         return
