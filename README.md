@@ -35,8 +35,15 @@ python main.py --single photo.jpg --format doc
 | **EasyOCR** | Печатный ru/en | easyocr Reader | Всегда (с fallback) |
 | **Tesseract** | Печатный, адаптивный PSM | tesseract.exe | Если EasyOCR < 70% |
 | **TrOCR** | Рукописный текст | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | Если все < 60% |
-| **GLM-OCR** | Отключён | `zai-org/GLM-OCR` — несовместим | — |
-| **OCRFeeder** | Несовместим | GNOME-приложение | — |
+
+### Альтернативные OCR движки (не встроены, устанавливаются вручную)
+
+| Engine | Назначение | Установка | Особенности |
+|--------|-----------|-----------|-------------|
+| **PaddleOCR** | Печатный ru/en, высокая точность | `pip install paddleocr` | Свой DL-фреймворк (PaddlePaddle), GPU, работает отдельно |
+| **Surya OCR** | Универсальный, много языков | `pip install surya-ocr` | На базе torch, современная архитектура |
+
+PaddleOCR рекомендуется как дополнительный движок для сложных случаев — он имеет собственный пайплайн и не зависит от EasyOCR/Tesseract.
 
 Каскадная схема даёт:
 - **EasyOCR** (1-2с) → быстрое распознавание печатного текста

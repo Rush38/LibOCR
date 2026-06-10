@@ -24,7 +24,7 @@
 - CUDA Toolkit 12.x
 - **Важно**: Python 3.11 или 3.12 — PyTorch с CUDA не поддерживает Python 3.13+
 
-## OCR Engines (3 движка, GLM-OCR отключён)
+## OCR Engines (3 движка + опциональные)
 
 ### EasyOCR
 - Печатный текст, русский/английский
@@ -33,8 +33,9 @@
 
 ### Tesseract OCR
 - Печатный текст, гибкая настройка PSM/OEM
+- Поддержка `rus_old` (дореволюционная орфография)
 - Путь к executable из `config.json`
-- Языковая модель: `rus+eng`
+- Языковая модель: `rus+eng` (или `rus_old+rus+eng`)
 
 ### TrOCR (HuggingFace)
 - **Рукописный текст** — основное назначение
@@ -46,11 +47,9 @@
 - Загружается через `VisionEncoderDecoderModel` + `TrOCRProcessor`
 - **Local model support**: модель скачивается в `models/` через `snapshot_download`, используется локально без повторной загрузки
 
-### GLM-OCR (HuggingFace, **ОТКЛЮЧЁН**)
-- Модель: `zai-org/GLM-OCR` — **НЕсовместим** с transformers pipeline (задача "ocr" недоступна)
-- Требует ручной настройки или альтернативной модели
-- Пока отключён, 3 движка обеспечивают достаточное качество
-- Конфигурируется в `config.json` -> `ocr.glmocr`
+### Альтернативные движки (не встроены)
+- **PaddleOCR** — `pip install paddleocr` (свой фреймворк PaddlePaddle, GPU)
+- **Surya OCR** — `pip install surya-ocr` (на базе torch)
 
 ## Dictionary System
 
@@ -167,7 +166,7 @@ Also produces:
 - [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, `error_reports/`, `~/.cache/huggingface/`
 
 ## Key Decisions
-- Hybrid OCR: EasyOCR + Tesseract + TrOCR (GLM-OCR отключён, параллельно 3 воркера)
+- Hybrid OCR: EasyOCR + Tesseract + TrOCR (параллельно 3 воркера, каскадный режим)
 - TrOCR: `Kansallisarkisto/cyrillic-large-handwritten` — CER=4%, 0.6B, Apache 2.0, lazy-loaded, GPU-auto
 - Postprocessor marks doubtful items but NEVER deletes from `raw_text`
 - Dictionary: `library_terms[]` + `fuzzy_corrections[]` from `dictionaries/library_dictionary.json`
