@@ -19,6 +19,7 @@ Four OCR engines run in parallel:
 | **Tesseract** | Printed, flexible PSM/OEM | tesseract.exe | avg per-char |
 | **TrOCR** | Handwritten text | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | ~92% |
 | **GLM-OCR** | Vision OCR (отключён) | `zai-org/GLM-OCR` — несовместим с transformers pipeline | — |
+| **OCRFeeder** | Desktop OCR (несовместим) | GNOME-приложение, не Python-библиотека | — |
 
 All HuggingFace models support **local download**: models cached in `models/` via `snapshot_download`, reused without re-downloading.
 
