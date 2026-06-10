@@ -301,26 +301,35 @@ def main():
                 subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
                 print_colored(f"  [OK] {name} установлен", Colors.GREEN)
 
-        print_colored("[INFO] Дополнительные OCR движки:", Colors.BLUE)
-        extras = [
-            ("paddleocr", "paddleocr", "PaddleOCR — высокая точность, свой DL-фреймворк"),
-            ("surya_ocr", "surya-ocr", "Surya OCR — современная архитектура на torch"),
-            ("doctr", "python-doctr", "docTR — документный OCR от Mindee"),
-            ("got_ocr", "got-ocr", "GOT-OCR2 — transformer OCR"),
+        print_colored("[INFO] Установка OCR движков (7 шт.):", Colors.BLUE)
+        engines = [
+            ("easyocr", None, "EasyOCR (уже установлен)"),
+            ("pytesseract", None, "Tesseract (уже установлен)"),
+            ("transformers", None, "TrOCR (уже установлен)"),
+            ("paddleocr", "paddleocr", "PaddleOCR — загрузка (~500MB)"),
+            ("surya_ocr", "surya-ocr", "Surya OCR — загрузка"),
+            ("doctr", "python-doctr", "docTR — загрузка"),
+            ("got_ocr", "got-ocr", "GOT-OCR2 — загрузка"),
         ]
-        for mod_name, pip_name, desc in extras:
+        for mod_name, pip_name, desc in engines:
+            if pip_name is None:
+                print_colored(f"  [OK] {desc}", Colors.GREEN)
+                continue
             try:
                 __import__(mod_name)
-                print_colored(f"  [OK] {desc}", Colors.GREEN)
+                print_colored(f"  [OK] {pip_name} — уже установлен", Colors.GREEN)
             except ImportError:
-                print_colored(f"  [..] Установка {desc}...", Colors.YELLOW)
+                print_colored(f"  [..] {desc}...", Colors.YELLOW)
                 try:
                     import subprocess, sys
-                    subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
-                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
-                    print_colored(f"  [OK] {desc}", Colors.GREEN)
+                    subprocess.check_call(
+                        [sys.executable, "-m", "pip", "install", pip_name],
+                        timeout=1200,
+                    )
+                    print_colored(f"  [OK] {pip_name} — установлен", Colors.GREEN)
                 except Exception as e:
-                    print_colored(f"  [WARN] {desc}: {e}", Colors.YELLOW)
+                    print_colored(f"  [FAIL] {desc}: {e}", Colors.RED)
+                    print_colored(f"         Попробуйте вручную: pip install {pip_name}", Colors.YELLOW)
 
         print_colored("[INFO] Загрузка rus_old.traineddata...", Colors.BLUE)
         import urllib.request

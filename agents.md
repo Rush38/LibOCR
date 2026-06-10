@@ -24,7 +24,7 @@
 - CUDA Toolkit 12.x
 - **Важно**: Python 3.11 или 3.12 — PyTorch с CUDA не поддерживает Python 3.13+
 
-## OCR Engines (7 движков)
+## OCR Engines (7 движков, все обязательные)
 
 ### EasyOCR
 - Печатный текст, русский/английский
