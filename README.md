@@ -1,25 +1,46 @@
 # LibOCR — OCR для библиотечных карточек
 
-Автономный оффлайн OCR для распознавания текста с фотографий библиотечных карточек. Поддерживает печатный и рукописный текст, штампы, линии, углы поворота 0–270°. **Всё в raw_text** — ничего не удаляется, сомнительные элементы помечаются.
+Автономный оффлайн OCR для распознавания текста с фотографий библиотечных карточек.
+Поддерживает печатный и рукописный текст, штампы, линии, углы поворота 0–270°.
+**Все результаты всех моделей** сохраняются — ничего не удаляется, сомнительные элементы помечаются.
+
+## Возможности
+
+### Приложение умеет:
+- **5 OCR движков** в каскадном режиме (EasyOCR → Tesseract → TrOCR → PaddleOCR → Surya OCR)
+- **Все движки всегда запускаются**, результаты каждого сохраняются отдельно
+- **Оценка моделей** — каждая модель оценивается от 0 до 100 в файле результата
+- **Время каждой модели** — `start` / `end` / `duration` для каждого движка
+- **Автоопределение типа документа** — `photo` / `old_document` / `default`
+- **PDF поддержка** — через PyMuPDF, без внешних зависимостей
+- **CUDA автоопределение** — проверка GPU при старте, предупреждение если недоступен
+- **Форматы вывода** — TXT / DOC (Word) / MD (Markdown) по выбору
+- **Дореволюционный текст** — поддержка `rus_old` через Tesseract
+- **Улучшенная бинаризация** — Sauvola для старых документов
+- **Контекстная коррекция** — биграммы для исправления слов
+- **Параллельная обработка batch** — `--workers N` для нескольких файлов одновременно
+- **Автоустановка** — `main.py --install` устанавливает все движки
+- **JSON / TXT / DOC / MD** — все результаты с полной структурой
+
+### Приложение НЕ умеет:
+- Распознавать лица, штрих-коды, QR-коды
+- Работать с видеофайлами
+- Распознавать подписи (только текст)
+- Исправлять перевёрнутые на 180° изображения (только 0-45°)
+- Гарантировать 100% качество на дореволюционных шрифтах
 
 ## Требования
 
 - Windows 10/11 (x64)
 - **Python 3.11 или 3.12** — версии 3.13+ не поддерживают CUDA
 - Tesseract OCR 5.3+ (для `rus_old` нужен пакет `rus_old.traineddata`)
-- GPU с CUDA (опционально, для EasyOCR и TrOCR)
+- GPU с CUDA (опционально, для EasyOCR, TrOCR, PaddleOCR, Surya OCR)
 
 ## Быстрый старт
 
 ```batch
-run.bat                — интерактивный режим
-run.bat --auto         — обработать всё в input_files
-run.bat --debug        — сохранять промежуточные изображения
-run.bat --input path   — указать папку
-run.bat --check        — проверка системы
-run.bat --resume       — продолжить batch
-run.bat --reset        — сбросить batch
-
+run.bat                — автоустановка + обработка input_files
+python main.py --install       — установка всех движков
 python main.py --input photos --format md
 python main.py --input photos --mode universal
 python main.py --input photos --workers 4
@@ -28,22 +49,37 @@ python main.py --single photo.jpg --format doc
 
 ## Архитектура
 
-Три OCR движка работают по **каскадной схеме** (сначала быстрые, потом точные):
+5 OCR движков работают в **каскадном режиме** — все запускаются всегда,
+каждый выдаёт свой результат. Лучший выбирается по max confidence.
 
-| Engine | Назначение | Модель | Когда запускается |
-|--------|-----------|--------|-------------------|
-| **EasyOCR** | Печатный ru/en | easyocr Reader | Всегда (с fallback) |
-| **Tesseract** | Печатный, адаптивный PSM | tesseract.exe | Если EasyOCR < 70% |
-| **TrOCR** | Рукописный текст | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | Если все < 60% |
+| Движок | Тип | CUDA | Результат в файле |
+|--------|-----|------|-------------------|
+| **EasyOCR** | Печатный ru/en | ✅ GPU-auto | `alternatives.easyocr_text` |
+| **Tesseract** | Печатный, adaptive PSM | CPU | `alternatives.tesseract_text` |
+| **TrOCR** | Рукописный кириллица | ✅ GPU-auto | `alternatives.trocr_text` |
+| **PaddleOCR** | Печатный ru/en | ✅ GPU (PaddlePaddle) | `alternatives.paddleocr_text` |
+| **Surya OCR** | Универсальный | ✅ GPU-auto | `alternatives.suryaocr_text` |
 
-### Альтернативные OCR движки (устанавливаются автоматически)
+### Оценка моделей в файле результата
 
-| Engine | Назначение | Особенности |
-|--------|-----------|-------------|
-| **PaddleOCR** | Печатный ru/en, высокая точность | Свой DL-фреймворк (PaddlePaddle), GPU, устанавливается через `--install` |
-| **Surya OCR** | Универсальный, много языков | На базе torch, современная архитектура, устанавливается через `--install` |
+В каждом TXT/DOC/MD файле выводится:
 
-Установка всех движков: `python main.py --install` или `run.bat` (автоматически).
+```
+ОЦЕНКА МОДЕЛЕЙ (0-100):
+  1. Tesseract: 83/100 (время: 5.0с)
+  2. EasyOCR: 68/100 (время: 1.4с)
+  3. TrOCR: 8/100 (время: 0.9с) ★
+
+РЕЗУЛЬТАТЫ ВСЕХ МОДЕЛЕЙ:
+----------------------------------------
+Модель: EasyOCR
+Оценка: 68/100
+Время начала: 10:15:30
+Время завершения: 10:15:32
+Длительность: 1.4с
+Определенный текст:
+...
+```
 
 Каскадная схема даёт:
 - **EasyOCR** (1-2с) → быстрое распознавание печатного текста
@@ -288,6 +324,7 @@ python main.py --single photo.jpg
 | `--format` | Формат вывода: `txt` (по умолч.), `doc` (Word), `md` (Markdown) |
 | `--mode` | Режим: `library` (библиотечные поля) или `universal` (только текст) |
 | `--workers N` | Число параллельных потоков для batch (по умолч. 1) |
+| `--install` | Установить все зависимости и дополнительные OCR движки |
 
 ## Структура проекта
 
@@ -360,33 +397,48 @@ LibOCR/
 ```json
 {
   "filename": "photo.jpg",
-  "reader_names": ["Иванов А.Б."],
-  "dates": ["15.03.2024"],
-  "possible_dates": ["12.06.19 — требует проверки"],
-  "inventory_numbers": ["№ СП-12345"],
-  "possible_stamps": ["ШАНС"],
+  "text_type": "printed",
+  "document_type": "old_document",
+  "primary_engine": "tesseract",
+  "language": "ru",
   "library_terms": ["библиотека", "читатель"],
   "fuzzy_corrections": [
     {"original": "боблиотека", "corrected": "библиотека", "distance": 1}
   ],
   "raw_text": "полный текст без удалений",
-  "text_type": "printed",
-  "primary_engine": "tesseract",
+  "formatted_text": "отформатированный текст (абзацы, заголовки)",
+  "possible_errors": ["строка 2: расхождение между движками"],
+  "consensus_validated": false,
+  "headers": ["ЗАГОЛОВОК"],
+  "footers": ["1"],
+  "page_numbers": ["1"],
   "alternatives": {
     "easyocr_text": "...",
     "tesseract_text": "...",
     "trocr_text": "...",
-    "glmocr_text": "..."
+    "glmocr_text": "...",
+    "paddleocr_text": "...",
+    "suryaocr_text": "..."
   },
   "confidence": {
     "overall": 0.87,
     "easyocr": 0.82,
     "tesseract": 0.91,
     "trocr": 0.92,
-    "glmocr": 0.88
+    "paddleocr": 0.0,
+    "suryaocr": 0.0
+  },
+  "best_engine": {
+    "name": "tesseract",
+    "confidence": 0.91,
+    "reason": "наивысшая уверенность (91%) (каскадный режим)"
+  },
+  "engine_times": {
+    "easyocr": {"start": "10:15:30", "end": "10:15:32", "duration": 1.36},
+    "tesseract": {"start": "10:15:32", "end": "10:15:37", "duration": 4.99},
+    "trocr": {"start": "10:15:37", "end": "10:15:38", "duration": 0.85}
   },
   "warnings": [],
-  "language": "ru",
   "detected_angle": 3.5,
   "corrected": true,
   "processing_time_sec": 12.5
