@@ -78,6 +78,7 @@
 - **Файл**: `dictionaries/library_dictionary.json`
 - **Загрузчик**: `dictionaries/dictionary_loader.py`
 - **Singleton pattern** — одна инстанция на процесс
+- **Поиск по ВСЕМ движкам** — словарь ищет термины в тексте всех 7 OCR движков (raw_text объединяет всё)
 - **Fuzzy-поиск**: расстояние Левенштейна ≤ 1
 - **Категории**: `library_terms`, `literary_terms`, `institutions`, `document_types`, `person_titles`, `date_formats`, `common_fillers`, `verification_markers`
 - **Graceful fallback**: если словарь отсутствует — не падает
@@ -177,9 +178,10 @@ Also produces:
 - [ ] `possible_*` fields exist for all extractors
 - [ ] `fuzzy_corrections[]` and `library_terms[]` from dictionary present in results
 - [ ] TrOCR results in `alternatives.trocr_text` and `confidence.trocr`
-- [ ] All 3 OCR engines (EasyOCR, Tesseract, TrOCR) integrated
+- [ ] All 7 OCR engines (EasyOCR, Tesseract, TrOCR, PaddleOCR, Surya, docTR, GOT-OCR2) integrated
 - [ ] Dictionary is loaded via `DictionaryLoader` singleton
-- [ ] TrOCR uses `VisionEncoderDecoderModel` + `TrOCRProcessor` from `Kansallisarkisto/cyrillic-large-handwritten`
+- [ ] Dictionary searches across ALL 7 engine results (raw_text combines everything)
+- [ ] TrOCR uses `VisionEncoderDecoderModel` + `ViTImageProcessor` + `AutoTokenizer` from `Kansallisarkisto/cyrillic-large-handwritten`
 - [ ] Error tracking saves to `error_reports/`
 - [ ] Nested image paths preserved: `input_files/sub/name.jpg` → `output_texts/sub/name.json`
 - [ ] Python files pass `python -m py_compile`
