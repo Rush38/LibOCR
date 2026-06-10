@@ -51,11 +51,17 @@ if not exist "%IN%" (
     echo [INFO] Created folder: %IN%
 )
 
-echo.
 echo LibOCR starting...
 echo Input: %IN%
 echo.
 
+echo [INFO] Проверка зависимостей...
+%PYTHON_EXE% -3.12 "%ROOT%main.py" --install 2>&1
+if errorlevel 1 (
+    echo [WARN] Установка зависимостей не удалась, продолжаем...
+)
+
+echo.
 %PYTHON_EXE% -3.12 "%ROOT%main.py" --input "%IN%" %DBG% %RES%
 
 if errorlevel 1 (

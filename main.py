@@ -85,6 +85,11 @@ def parse_arguments():
         default=None,
         help="Число параллельных потоков для batch (по умолч. 1)",
     )
+    parser.add_argument(
+        "--install",
+        action="store_true",
+        help="Установить все зависимости и дополнительные OCR движки",
+    )
     return parser.parse_args()
 
 
@@ -258,6 +263,39 @@ def process_single_image(
 
 
 def main():
+    args = parse_arguments()
+
+    if args.install:
+        print_colored("[INFO] Установка зависимостей...", Colors.BLUE)
+        install_deps = [
+            ("PyMuPDF", "PyMuPDF>=1.23.0"),
+            ("python-docx", "python-docx>=1.0.0"),
+        ]
+        for name, pkg in install_deps:
+            try:
+                __import__(name.replace("-", "_").split(">")[0].split("=")[0])
+                print_colored(f"  [OK] {name}", Colors.GREEN)
+            except ImportError:
+                import subprocess, sys
+                print_colored(f"  [..] Установка {name}...", Colors.YELLOW)
+                subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+                print_colored(f"  [OK] {name} установлен", Colors.GREEN)
+
+        print_colored("[INFO] Дополнительные OCR движки (опционально):", Colors.BLUE)
+        extras = [
+            ("paddleocr", "paddleocr", "PaddleOCR — высокая точность, свой DL-фреймворк"),
+            ("surya_ocr", "surya-ocr", "Surya OCR — современная архитектура"),
+        ]
+        for mod_name, pip_name, desc in extras:
+            try:
+                __import__(mod_name)
+                print_colored(f"  [OK] {desc}", Colors.GREEN)
+            except ImportError:
+                print_colored(f"  [- ] {desc} — пропущен (pip install {pip_name})", Colors.GRAY)
+
+        print_colored("[OK] Установка завершена", Colors.GREEN)
+        return
+
     try:
         from datetime import datetime
         log_dir = get_project_root() / "logs"
