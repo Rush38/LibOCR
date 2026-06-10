@@ -37,6 +37,9 @@ class HybridOCREngine:
         )
         self._glm_local_dir = self.glm_config.get("local_models_dir", "models")
 
+        self._paddleocr_reader = None
+        self._surya_ocr_reader = None
+
     @property
     def easyocr_reader(self):
         if self._easyocr_reader is None:
@@ -280,6 +283,24 @@ class HybridOCREngine:
                 if trocr_result.get("error"):
                     msg = f"TrOCR: {trocr_result['error']}"
                     warnings.append(msg)
+
+                t6 = tmod.time()
+                t6_str = dt.datetime.now().strftime("%H:%M:%S")
+                paddle_result = self._run_paddleocr(image)
+                t7_str = dt.datetime.now().strftime("%H:%M:%S")
+                engine_times["paddleocr"] = {"start": t6_str, "end": t7_str, "duration": round(tmod.time() - t6, 2)}
+                results["paddleocr"] = paddle_result
+                if paddle_result.get("error"):
+                    warnings.append(f"PaddleOCR: {paddle_result['error']}")
+
+                t8 = tmod.time()
+                t8_str = dt.datetime.now().strftime("%H:%M:%S")
+                surya_result = self._run_suryaocr(image)
+                t9_str = dt.datetime.now().strftime("%H:%M:%S")
+                engine_times["suryaocr"] = {"start": t8_str, "end": t9_str, "duration": round(tmod.time() - t8, 2)}
+                results["suryaocr"] = surya_result
+                if surya_result.get("error"):
+                    warnings.append(f"SuryaOCR: {surya_result['error']}")
             else:
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     f_easy = executor.submit(self._run_easyocr, image)
@@ -322,8 +343,13 @@ class HybridOCREngine:
         trocr_conf = results.get("trocr", {}).get("confidence", 0.0)
         glm_text = results.get("glmocr", {}).get("text", "")
         glm_conf = results.get("glmocr", {}).get("confidence", 0.0)
+        paddle_text = results.get("paddleocr", {}).get("text", "")
+        paddle_conf = results.get("paddleocr", {}).get("confidence", 0.0)
+        surya_text = results.get("suryaocr", {}).get("text", "")
+        surya_conf = results.get("suryaocr", {}).get("confidence", 0.0)
 
-        conf_map = {"easyocr": easy_conf, "tesseract": tess_conf, "trocr": trocr_conf}
+        conf_map = {"easyocr": easy_conf, "tesseract": tess_conf, "trocr": trocr_conf,
+                    "paddleocr": paddle_conf, "suryaocr": surya_conf}
         active = {k: v for k, v in conf_map.items() if v > 0}
         overall = sum(active.values()) / len(active) if active else 0.0
 
@@ -337,10 +363,14 @@ class HybridOCREngine:
             "tesseract_text": tess_text,
             "trocr_text": trocr_text,
             "glmocr_text": glm_text,
+            "paddleocr_text": paddle_text,
+            "suryaocr_text": surya_text,
             "easyocr_conf": easy_conf,
             "tesseract_conf": tess_conf,
             "trocr_conf": trocr_conf,
             "glmocr_conf": glm_conf,
+            "paddleocr_conf": paddle_conf,
+            "suryaocr_conf": surya_conf,
             "overall_conf": overall,
             "best_engine": {
                 "name": best_name,
@@ -566,6 +596,93 @@ class HybridOCREngine:
                 _ = self._init_glmocr()
             except Exception:
                 pass
+
+    @property
+    def paddleocr_reader(self):
+        if self._paddleocr_reader is None:
+            try:
+                import paddleocr
+                self._paddleocr_reader = paddleocr.PaddleOCR(
+                    lang=self.easy_config.get("languages", ["ru", "en"])[0],
+                    use_angle_cls=True,
+                    show_log=False,
+                    use_gpu=self._easyocr_gpu,
+                )
+            except Exception as e:
+                logging.getLogger("LibraryOCR").warning(f"PaddleOCR: not available ({e})")
+                return None
+        return self._paddleocr_reader
+
+    @property
+    def surya_ocr_reader(self):
+        if self._surya_ocr_reader is None:
+            try:
+                from surya.ocr import run_ocr
+                from surya.model.recognition.model import load_model as load_rec_model
+                from surya.model.recognition.processor import load_processor as load_rec_processor
+                from surya.model.detection.model import load_model as load_det_model
+                from surya.model.detection.processor import load_processor as load_det_processor
+                self._surya_ocr_reader = {
+                    "run": run_ocr,
+                    "rec_model": load_rec_model(),
+                    "rec_processor": load_rec_processor(),
+                    "det_model": load_det_model(),
+                    "det_processor": load_det_processor(),
+                }
+            except Exception as e:
+                logging.getLogger("LibraryOCR").warning(f"Surya OCR: not available ({e})")
+                return None
+        return self._surya_ocr_reader
+
+    def _run_paddleocr(self, image: np.ndarray) -> Dict[str, Any]:
+        reader = self.paddleocr_reader
+        if reader is None:
+            return {"text": "", "confidence": 0.0, "error": "PaddleOCR не загружен"}
+        try:
+            result = reader.ocr(image, cls=True)
+            texts = []
+            confs = []
+            if result and result[0]:
+                for line in result[0]:
+                    if len(line) >= 2:
+                        if isinstance(line[1], tuple):
+                            text, conf = line[1]
+                        else:
+                            bbox, (text, conf) = line[0], line[1]
+                        texts.append(str(text))
+                        try:
+                            confs.append(float(conf))
+                        except (ValueError, TypeError):
+                            pass
+            combined = " ".join(texts)
+            avg_conf = float(np.mean(confs)) if confs else 0.0
+            return {"text": combined, "confidence": avg_conf}
+        except Exception as e:
+            return {"text": "", "confidence": 0.0, "error": str(e)}
+
+    def _run_suryaocr(self, image: np.ndarray) -> Dict[str, Any]:
+        reader = self.surya_ocr_reader
+        if reader is None:
+            return {"text": "", "confidence": 0.0, "error": "Surya OCR не загружен"}
+        try:
+            from PIL import Image
+            pil_img = Image.fromarray(image)
+            predictions = reader["run"](
+                [pil_img],
+                [["ru", "en"]],
+                reader["det_model"],
+                reader["det_processor"],
+                reader["rec_model"],
+                reader["rec_processor"],
+            )
+            texts = []
+            if predictions and len(predictions) > 0:
+                for pred in predictions[0].text_lines:
+                    texts.append(pred.text)
+            combined = " ".join(texts)
+            return {"text": combined, "confidence": 0.85}
+        except Exception as e:
+            return {"text": "", "confidence": 0.0, "error": str(e)}
 
     def download_models(self):
         for model_name, local_dir in [
