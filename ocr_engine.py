@@ -639,10 +639,13 @@ class HybridOCREngine:
                     show_log=False,
                     use_gpu=self._easyocr_gpu,
                 )
+            except ImportError:
+                logging.getLogger("LibraryOCR").warning("PaddleOCR: not available")
+                self._paddleocr_reader = False
             except Exception as e:
-                logging.getLogger("LibraryOCR").warning(f"PaddleOCR: not available ({e})")
-                return None
-        return self._paddleocr_reader
+                logging.getLogger("LibraryOCR").warning(f"PaddleOCR: {e}")
+                self._paddleocr_reader = False
+        return self._paddleocr_reader if self._paddleocr_reader else None
 
     @property
     def surya_ocr_reader(self):
@@ -660,10 +663,13 @@ class HybridOCREngine:
                     "det_model": load_det_model(),
                     "det_processor": load_det_processor(),
                 }
+            except ImportError:
+                logging.getLogger("LibraryOCR").warning("Surya OCR: not available")
+                self._surya_ocr_reader = False
             except Exception as e:
-                logging.getLogger("LibraryOCR").warning(f"Surya OCR: not available ({e})")
-                return None
-        return self._surya_ocr_reader
+                logging.getLogger("LibraryOCR").warning(f"Surya OCR: {e}")
+                self._surya_ocr_reader = False
+        return self._surya_ocr_reader if self._surya_ocr_reader else None
 
     def _run_paddleocr(self, image: np.ndarray) -> Dict[str, Any]:
         reader = self.paddleocr_reader
@@ -727,10 +733,13 @@ class HybridOCREngine:
                 if use_gpu:
                     predictor = predictor.cuda()
                 self._doctr_reader = {"predictor": predictor, "doc_file": DocumentFile}
+            except ImportError:
+                logging.getLogger("LibraryOCR").warning("docTR: not available")
+                self._doctr_reader = False
             except Exception as e:
-                logging.getLogger("LibraryOCR").warning(f"docTR: not available ({e})")
-                return None
-        return self._doctr_reader
+                logging.getLogger("LibraryOCR").warning(f"docTR: {e}")
+                self._doctr_reader = False
+        return self._doctr_reader if self._doctr_reader else None
 
     def _run_doctr(self, image: np.ndarray) -> Dict[str, Any]:
         reader = self.doctr_reader
@@ -760,10 +769,13 @@ class HybridOCREngine:
             try:
                 from got_ocr import GOT_OCR
                 self._gotocr_reader = GOT_OCR()
+            except ImportError:
+                logging.getLogger("LibraryOCR").warning("GOT-OCR: not available")
+                self._gotocr_reader = False
             except Exception as e:
-                logging.getLogger("LibraryOCR").warning(f"GOT-OCR: not available ({e})")
-                return None
-        return self._gotocr_reader
+                logging.getLogger("LibraryOCR").warning(f"GOT-OCR: {e}")
+                self._gotocr_reader = False
+        return self._gotocr_reader if self._gotocr_reader else None
 
     def _run_gotocr(self, image: np.ndarray) -> Dict[str, Any]:
         reader = self.gotocr_reader

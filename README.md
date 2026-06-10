@@ -39,9 +39,9 @@
 ## Быстрый старт
 
 ```batch
-run.bat                — автоустановка + обработка input_files
-python main.py --install       — установка всех движков
-python main.py --input photos --mode universal
+python main.py --install       — установить ВСЕ 7 OCR движков (обязательно перед первым запуском!)
+run.bat                        — автоустановка + обработка input_files
+python main.py --input photos  — обработать папку
 python main.py --input photos --workers 4
 python main.py --single photo.jpg
 ```
