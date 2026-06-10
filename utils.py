@@ -161,6 +161,63 @@ def save_txt_output(path, data):
         f.write("\n".join(lines))
 
 
+def save_doc_output(path, data):
+    try:
+        from docx import Document
+        from docx.shared import Pt, Inches
+        doc = Document()
+        style = doc.styles["Normal"]
+        font = style.font
+        font.name = "Arial"
+        font.size = Pt(11)
+
+        doc.add_heading(f"LibOCR Result: {data.get('filename', 'unknown')}", 0)
+        p = doc.add_paragraph()
+        p.add_run("Language: ").bold = True
+        p.add_run(data.get("language", "unknown"))
+        p = doc.add_paragraph()
+        p.add_run("Confidence: ").bold = True
+        conf = data.get("confidence", {}).get("overall", 0)
+        p.add_run(f"{conf:.0%}")
+        p = doc.add_paragraph()
+        p.add_run("Time: ").bold = True
+        p.add_run(f"{data.get('processing_time_sec', 0):.1f}s")
+
+        doc.add_heading("Text", 1)
+        doc.add_paragraph(data.get("raw_text", ""))
+
+        if data.get("warnings"):
+            doc.add_heading("Warnings", 1)
+            for warn in data["warnings"]:
+                doc.add_paragraph(warn, style="List Bullet")
+
+        doc.save(str(path))
+    except ImportError:
+        save_txt_output(path.with_suffix(".txt"), data)
+
+
+def save_md_output(path, data):
+    sep = "---"
+    lines = [
+        f"# LibOCR Result: {data.get('filename', 'unknown')}",
+        sep,
+        f"**Language:** {data.get('language', 'unknown')}",
+        f"**Confidence:** {data.get('confidence', {}).get('overall', 0):.0%}",
+        f"**Time:** {data.get('processing_time_sec', 0):.1f}s",
+        f"**Text type:** {data.get('text_type', 'unknown')}",
+        f"**Engine:** {data.get('primary_engine', 'unknown')}",
+        sep,
+        "## Raw Text",
+        data.get("raw_text", ""),
+    ]
+    if data.get("warnings"):
+        lines += [sep, "## Warnings"]
+        lines += [f"- {w}" for w in data["warnings"]]
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(lines))
+
+
 def memory_cleanup():
     try:
         gc.collect()

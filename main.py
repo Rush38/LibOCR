@@ -12,6 +12,8 @@ from utils import (
     get_all_image_files,
     save_json_output,
     save_txt_output,
+    save_doc_output,
+    save_md_output,
     print_colored,
     Colors,
     memory_cleanup,
@@ -63,6 +65,13 @@ def parse_arguments():
         default=None,
         help="Обработать один файл",
     )
+    parser.add_argument(
+        "--format",
+        type=str,
+        default=None,
+        choices=["txt", "doc", "md"],
+        help="Формат вывода: txt (по умолч.), doc (Word), md (Markdown)",
+    )
     return parser.parse_args()
 
 
@@ -79,11 +88,12 @@ def process_single_image(
     debug_mode=False,
     max_retries=3,
     retry_delay=2,
+    output_format="txt",
 ):
     filename = img_path.name
     is_pdf = img_path.suffix.lower() == ".pdf"
     json_path = make_output_subdir(img_path, input_dir, output_dir).with_suffix(".json")
-    txt_path = json_path.with_suffix(".txt")
+    txt_path = json_path.with_suffix(f".{output_format}")
     start_time = time.time()
 
     for attempt in range(max_retries):
@@ -155,10 +165,15 @@ def process_single_image(
             )
 
             json_path = output_dir / f"{img_path.stem}.json"
-            txt_path = output_dir / f"{img_path.stem}.txt"
+            txt_path = output_dir / f"{img_path.stem}.{output_format}"
 
             save_json_output(json_path, result_data)
-            save_txt_output(txt_path, result_data)
+            if output_format == "txt":
+                save_txt_output(txt_path, result_data)
+            elif output_format == "doc":
+                save_doc_output(txt_path, result_data)
+            elif output_format == "md":
+                save_md_output(txt_path, result_data)
 
             elapsed = time.time() - start_time
             overall = result_data["confidence"]["overall"]
@@ -231,6 +246,7 @@ def main():
         args = parse_arguments()
         config = load_config()
         logger = setup_logging(config)
+        output_format = args.format or config.get("output", {}).get("format", "txt")
     except Exception as e:
         import sys
         from pathlib import Path
@@ -349,6 +365,7 @@ def main():
                 debug_mode=args.debug,
                 max_retries=max_retries,
                 retry_delay=retry_delay,
+                output_format=output_format,
             )
             results.append(result)
             if result["status"] == "OK":

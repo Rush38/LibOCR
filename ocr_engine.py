@@ -104,6 +104,9 @@ class HybridOCREngine:
             return
 
         try:
+            import logging
+            logging.getLogger("transformers").setLevel(logging.ERROR)
+
             from transformers import (
                 TrOCRProcessor,
                 VisionEncoderDecoderModel,

@@ -86,6 +86,7 @@
     "encoding": "utf-8-sig",
     "csv_sep": ";",
     "max_log_mb": 10,
-    "log_backups": 5
+    "log_backups": 5,
+    "format": "txt"
   }
 }
