@@ -18,11 +18,19 @@ if "%~1"=="--input" set IN=%~2
 goto run
 
 :run
-where python >nul 2>nul
+set PYTHON_EXE=py
+py -3.12 -V >nul 2>nul
 if errorlevel 1 (
-    echo [FAIL] Python not found. Run install.ps1 as administrator.
-    pause
-    exit /b 1
+    set PYTHON_EXE=python
+    where python >nul 2>nul
+    if errorlevel 1 (
+        echo [FAIL] Python not found. Run install.ps1 as administrator.
+        pause
+        exit /b 1
+    )
+    echo [WARN] Using system Python (GPU may not work)
+) else (
+    echo [INFO] Using Python 3.12 (GPU support)
 )
 
 if not defined IN set IN=%ROOT%input_images
@@ -44,7 +52,7 @@ echo LibOCR starting...
 echo Input: %IN%
 echo.
 
-python "%ROOT%main.py" --input "%IN%" %DBG% %RES%
+%PYTHON_EXE% -3.12 "%ROOT%main.py" --input "%IN%" %DBG% %RES%
 
 if errorlevel 1 (
     echo.

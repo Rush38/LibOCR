@@ -57,22 +57,45 @@ class PostProcessor:
 
         language = self._detect_language(raw_text)
 
+        text_type = self._detect_text_type(combined)
+        primary_engine = self._select_primary_engine(
+            text_type,
+            ocr_result.get("easyocr_conf", 0.0),
+            ocr_result.get("tesseract_conf", 0.0),
+            ocr_result.get("trocr_conf", 0.0),
+        )
+
+        raw_parts = [
+            f"[ОСНОВНОЙ: {primary_engine.upper()}] ({text_type})",
+            raw_text,
+        ]
+        if reader_names:
+            raw_parts.append("[ИМЕНА] " + "; ".join(reader_names))
+        if possible_readers:
+            raw_parts.append("[ИМЕНА?] " + "; ".join(possible_readers) + " — требует проверки")
+        if dates:
+            raw_parts.append("[ДАТЫ] " + "; ".join(dates))
+        if possible_dates:
+            raw_parts.append("[ДАТЫ?] " + "; ".join(possible_dates))
+        if inventory_numbers:
+            raw_parts.append("[ИНВЕНТАРЬ] " + "; ".join(inventory_numbers))
+        if possible_stamps:
+            raw_parts.append("[ШТАМПЫ] " + "; ".join(possible_stamps))
+
+        full_raw_text = "\n\n".join(raw_parts)
+
         return {
             "filename": filename,
             "detected_angle": metadata.get("detected_angle", 0.0),
             "corrected": metadata.get("corrected", False),
             "processing_time_sec": round(elapsed, 2),
-            "engines_used": ["easyocr", "tesseract"],
-            "reader_names": reader_names,
-            "possible_readers": possible_readers,
-            "dates": dates,
-            "possible_dates": possible_dates,
-            "inventory_numbers": inventory_numbers,
-            "possible_stamps": possible_stamps,
+            "engines_used": ["easyocr", "tesseract", "trocr"],
+            "text_type": text_type,
+            "primary_engine": primary_engine,
             "possible_noise": possible_noise,
             "library_terms": library_terms,
             "fuzzy_corrections": fuzzy_corrections,
-            "raw_text": raw_text,
+            "raw_text": full_raw_text,
             "alternatives": {
                 "easyocr_text": easy_text,
                 "tesseract_text": tess_text,
@@ -224,3 +247,36 @@ class PostProcessor:
         if not self._dict:
             return []
         return self._dict.match_patterns(text, max_edit_distance=1)
+
+    def _detect_text_type(self, text: str) -> str:
+        if not text.strip():
+            return "unknown"
+        handwritten_indicators = 0
+        printed_indicators = 0
+        irregular_chars = 0
+        for char in text:
+            if char in "ёЁіІєЄїЇґҐ":
+                handwritten_indicators += 1
+            if char.isdigit():
+                printed_indicators += 1
+            if 0x2500 <= ord(char) <= 0x257F:
+                irregular_chars += 1
+        words = text.split()
+        if not words:
+            return "printed"
+        avg_word_len = sum(len(w) for w in words) / len(words)
+        if avg_word_len < 3:
+            handwritten_indicators += 2
+        if handwritten_indicators > printed_indicators:
+            return "handwritten"
+        return "printed"
+
+    def _select_primary_engine(
+        self, text_type: str, easy_conf: float, tess_conf: float, trocr_conf: float
+    ) -> str:
+        if text_type == "handwritten":
+            if trocr_conf > 0.1:
+                return "trocr"
+        if tess_conf >= easy_conf:
+            return "tesseract"
+        return "easyocr"

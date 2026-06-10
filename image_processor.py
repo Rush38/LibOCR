@@ -14,7 +14,8 @@ class ImageProcessor:
     def process(
         self, image_path: Path
     ) -> Tuple[List[np.ndarray], Dict[str, Any]]:
-        img = cv2.imread(str(image_path))
+        img_bytes = np.fromfile(str(image_path), dtype=np.uint8)
+        img = cv2.imdecode(img_bytes, cv2.IMREAD_COLOR)
         if img is None:
             raise ValueError(f"Не удалось открыть изображение: {image_path}")
 

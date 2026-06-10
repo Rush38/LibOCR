@@ -18,9 +18,48 @@ Four OCR engines run in parallel:
 | **EasyOCR** | Printed ru/en | easyocr Reader | per-bbox |
 | **Tesseract** | Printed, flexible PSM/OEM | tesseract.exe | avg per-char |
 | **TrOCR** | Handwritten text | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | ~92% |
-| **GLM-OCR** | Vision OCR, extra accuracy | `zai-org/GLM-OCR` (HuggingFace) | ~88% |
+| **GLM-OCR** | Vision OCR (отключён) | `zai-org/GLM-OCR` — несовместим с transformers pipeline | — |
 
 All HuggingFace models support **local download**: models cached in `models/` via `snapshot_download`, reused without re-downloading.
+
+## Логика работы
+
+### 1. Загрузка изображения
+- Изображение читается через OpenCV (`np.fromfile` + `cv2.imdecode` — поддержка кириллических путей)
+- Применяется предобработка: denoise → angle correction → CLAHE → line removal → stamp suppression → column splitting
+
+### 2. Параллельная обработка тремя OCR движками
+```
+Image → [EasyOCR] → text + confidence
+     → [Tesseract] → text + confidence
+     → [TrOCR] → text + confidence (handwritten specialist)
+```
+
+### 3. Определение типа текста
+- Анализ распознанного текста: `handwritten` / `printed` / `unknown`
+- Критерии: наличие специфичных символов (ё, і, є), длина слов, паттерны
+
+### 4. Выбор приоритетного движка
+- Для `handwritten` → TrOCR (если доступен)
+- Для `printed` → Tesseract или EasyOCR (по max confidence)
+- Поле `primary_engine` в JSON указывает основной движок
+
+### 5. Постобработка
+- Извлечение дат, инвентарных номеров, штампов
+- Поиск библиотечных терминов через словарь
+- Fuzzy-коррекция (расстояние Левенштейна ≤ 1)
+- Определение языка (ru/en/mixed)
+
+### 6. Сохранение результатов
+- **JSON**: полная структура с `raw_text`, `alternatives`, `confidence`, `library_terms`, `fuzzy_corrections`
+- **TXT**: человекочитаемый отчёт
+- **CSV**: сводная таблица
+
+### GPU-ускорение
+При наличии CUDA:
+- EasyOCR автоматически использует GPU
+- TrOCR загружается на GPU
+- Обработка в 5-10x быстрее
 
 ## Словарь
 
@@ -49,11 +88,27 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
 
 ### Ручная
 
-1. Python 3.11+ с [python.org](https://www.python.org/downloads/)
+1. **Python 3.11 или 3.12** с [python.org](https://www.python.org/downloads/) — **важно: для GPU требуется 3.11-3.12, версии 3.13+ не поддерживают CUDA**
 2. Tesseract OCR 5.3+ с [UB-Mannheim](https://github.com/UB-Mannheim/tesseract/releases)
 3. `rus.traineddata` → папка `tessdata` Tesseract
 4. `pip install -r requirements.txt`
-5. Обновите путь к Tesseract в `config.json` при необходимости
+5. **Важно**: если устанавливали ранее — переустановите: `pip install --upgrade -r requirements.txt`
+6. Обновите путь к Tesseract в `config.json` при необходимости
+
+### GPU (опционально)
+
+Для использования видеокарты:
+- NVIDIA GPU с CUDA (RTX 3080+ рекомендуется, 8GB+ VRAM)
+- NVIDIA Driver (любая последняя версия)
+- CUDA Toolkit 12.x
+- Python 3.11 или 3.12 (обязательно для PyTorch CUDA)
+
+## Стратегия обработки
+
+1. **Определение типа текста** — анализ распознанного текста для детекции `handwritten` / `printed`
+2. **Приоритетный движок** — на основе типа: TrOCR для рукописного, Tesseract/EasyOCR для печатного
+3. **Все результаты в одном файле** — каждый движок отображается в `raw_text` с тегом `[ОСНОВНОЙ: TROCR] (handwritten)`
+4. **Поля `text_type`** и **`primary_engine`** — указывают тип текста и выбранный основной движок
 
 ## Конфигурация
 
@@ -145,7 +200,7 @@ python main.py --single photo.jpg
 ```
 LibOCR/
 ├── main.py                    — точка входа, CLI
-├── ocr_engine.py              — 4 engines: EasyOCR + Tesseract + TrOCR + GLM-OCR
+├── ocr_engine.py              — 3 engines: EasyOCR + Tesseract + TrOCR (GLM-OCR отключён)
 ├── image_processor.py         — preprocessing: углы, CLAHE, линии, штампы
 ├── postprocessor.py           — разбор: имена, даты, номера, штампы
 ├── batch_state.py             — resume/reset state
@@ -162,6 +217,24 @@ LibOCR/
 └── claude.md                  — инструкции для Claude Code
 ```
 
+## Вывод в консоли
+
+При обработке отображается:
+- Имя файла
+- Тип текста (`printed`/`handwritten`)
+- Приоритетный движок (`primary_engine`)
+- Найдено библиотечных терминов
+- Confidence по каждому движку
+- Время обработки
+- Превью распознанного текста (первые 80 символов)
+
+```
+[OK] image00019.jpg | printed | tesseract | 3 терминов | T:91% Tr:0% | 5.8s
+     Text: 427935 Автогр. В 48 Винников, Вадим...
+[WARN] image00001.jpg | handwritten | tesseract | 0 терминов | T:0% Tr:0% | 12.1s
+     Text: / sone ah | one м os ey м Saha yo...
+```
+
 ## Результаты
 
 После обработки в `output_texts/`:
@@ -169,6 +242,7 @@ LibOCR/
 - **`<имя>.json`** — полная структура
 - **`<имя>.txt`** — человекочитаемый отчёт
 - **`summary_report.csv`** — сводная таблица
+- Папка `output_texts/` автоматически открывается после завершения (Windows)
 
 При ошибке в `error_reports/`:
 - **`<filename>_<timestamp>_error.txt`** — отчёт с именем файла, путём и текстом ошибки
@@ -188,6 +262,8 @@ LibOCR/
     {"original": "боблиотека", "corrected": "библиотека", "distance": 1}
   ],
   "raw_text": "полный текст без удалений",
+  "text_type": "printed",
+  "primary_engine": "tesseract",
   "alternatives": {
     "easyocr_text": "...",
     "tesseract_text": "...",

@@ -51,6 +51,27 @@ class HybridOCREngine:
             self._init_trocr()
         return self._trocr_model
 
+    def download_models(self) -> Dict[str, str]:
+        results = {}
+        import logging
+        logger = logging.getLogger("LibraryOCR")
+
+        if self.trocr_config.get("enabled", False):
+            model_name = self._trocr_model_name
+            local_dir = self._trocr_local_dir
+            logger.info(f"Downloading TrOCR model: {model_name}")
+            path = self._download_model_locally(model_name, local_dir)
+            results["trocr"] = str(path) if path else "failed"
+
+        if self.glm_config.get("enabled", False):
+            model_name = self._glm_model_name
+            local_dir = self._glm_local_dir
+            logger.info(f"Downloading GLM-OCR model: {model_name}")
+            path = self._download_model_locally(model_name, local_dir)
+            results["glmocr"] = str(path) if path else "failed"
+
+        return results
+
     def _get_model_dir(self, model_name: str, local_dir: str) -> Optional[Path]:
         root = Path(__file__).parent
         models_root = root / local_dir
@@ -93,15 +114,26 @@ class HybridOCREngine:
             local_dir = self._trocr_local_dir
 
             local_path = self._get_model_dir(model_name, local_dir)
+            if not local_path:
+                import logging
+                logger = logging.getLogger("LibraryOCR")
+                logger.info(f"TrOCR: model not found locally, downloading...")
+                local_path = self._download_model_locally(model_name, local_dir)
+
             if local_path:
                 load_from = str(local_path)
             else:
                 load_from = model_name
 
+            import logging
+            logger = logging.getLogger("LibraryOCR")
+            logger.info(f"TrOCR: loading model from {load_from}")
+
             self._trocr_processor = TrOCRProcessor.from_pretrained(load_from)
             self._trocr_model = VisionEncoderDecoderModel.from_pretrained(load_from)
             self._trocr_model.to(device)
             self._trocr_model.eval()
+            logger.info(f"TrOCR: model loaded successfully, device={device}")
             self._trocr_device_name = device
 
         except ImportError as e:
@@ -113,8 +145,10 @@ class HybridOCREngine:
             self._trocr_processor = None
         except Exception as e:
             import logging
-            logging.getLogger("LibraryOCR").warning(f"TrOCR: failed to load model ({e})")
+            logger = logging.getLogger("LibraryOCR")
+            logger.error(f"TrOCR: FAILED to load model ({e})", exc_info=True)
             self._trocr_model = None
+            self._trocr_processor = None
             self._trocr_processor = None
 
     def _init_glmocr(self):
@@ -175,6 +209,9 @@ class HybridOCREngine:
     def recognize(self, image: np.ndarray) -> Dict[str, Any]:
         timeout = self.config["processing"]["timeout_engine"]
 
+        _ = self.easyocr_reader
+        _ = self.trocr_model
+
         easy_result: Optional[Dict] = None
         tess_result: Optional[Dict] = None
         trocr_result: Optional[Dict] = None
@@ -219,17 +256,25 @@ class HybridOCREngine:
         except Exception as e:
             warnings.append(f"ThreadPool: {str(e)}")
 
-        easy_text = easy_result["text"] if easy_result else ""
-        easy_conf = easy_result["confidence"] if easy_result else 0.0
+        easy_text = easy_result.get("text", "") if easy_result else ""
+        easy_conf = easy_result.get("confidence", 0.0) if easy_result else 0.0
+        if easy_result and easy_result.get("error"):
+            warnings.append(f"EasyOCR: {easy_result['error']}")
 
-        tess_text = tess_result["text"] if tess_result else ""
-        tess_conf = tess_result["confidence"] if tess_result else 0.0
+        tess_text = tess_result.get("text", "") if tess_result else ""
+        tess_conf = tess_result.get("confidence", 0.0) if tess_result else 0.0
+        if tess_result and tess_result.get("error"):
+            warnings.append(f"Tesseract: {tess_result['error']}")
 
-        trocr_text = trocr_result["text"] if trocr_result else ""
-        trocr_conf = trocr_result["confidence"] if trocr_result else 0.0
+        trocr_text = trocr_result.get("text", "") if trocr_result else ""
+        trocr_conf = trocr_result.get("confidence", 0.0) if trocr_result else 0.0
+        if trocr_result and trocr_result.get("error"):
+            warnings.append(f"TrOCR: {trocr_result['error']}")
 
-        glm_text = glm_result["text"] if glm_result else ""
-        glm_conf = glm_result["confidence"] if glm_result else 0.0
+        glm_text = glm_result.get("text", "") if glm_result else ""
+        glm_conf = glm_result.get("confidence", 0.0) if glm_result else 0.0
+        if glm_result and glm_result.get("error"):
+            warnings.append(f"GLM-OCR: {glm_result['error']}")
 
         active_confs = [c for c in [easy_conf, tess_conf, trocr_conf, glm_conf] if c > 0]
         overall = sum(active_confs) / len(active_confs) if active_confs else 0.0
@@ -248,23 +293,57 @@ class HybridOCREngine:
         }
 
     def _run_easyocr(self, image: np.ndarray) -> Dict[str, Any]:
-        results = self.easyocr_reader.readtext(
-            image,
-            paragraph=self.easy_config.get("paragraph", True),
-        )
+        try:
+            results = self.easyocr_reader.readtext(
+                image,
+                paragraph=self.easy_config.get("paragraph", True),
+            )
 
-        text_parts = []
-        confidences = []
+            text_parts = []
+            confidences = []
 
-        for bbox, text, conf in results:
-            if text and text.strip():
-                text_parts.append(text.strip())
-                confidences.append(float(conf))
+            for item in results:
+                text = None
+                conf = None
 
-        text = "\n".join(text_parts)
-        confidence = float(np.mean(confidences)) if confidences else 0.0
+                if len(item) >= 3:
+                    if isinstance(item[1], str) and isinstance(item[2], (int, float)):
+                        text, conf = item[1], item[2]
+                    elif isinstance(item[2], str) and isinstance(item[1], (int, float)):
+                        text, conf = item[2], item[1]
+                elif len(item) == 2:
+                    if isinstance(item[0], str) and isinstance(item[1], (int, float, str)):
+                        text, conf = item[0], item[1]
+                    elif isinstance(item[1], str) and isinstance(item[0], (int, float, str)):
+                        text, conf = item[1], item[0]
 
-        return {"text": text, "confidence": confidence}
+                if text is None or conf is None:
+                    continue
+
+                if isinstance(text, list):
+                    text = " ".join(str(t) for t in text)
+                elif not isinstance(text, str):
+                    text = str(text)
+
+                try:
+                    conf_float = float(conf)
+                    if 0 <= conf_float <= 1:
+                        conf_value = conf_float
+                    else:
+                        conf_value = 0.5
+                except (ValueError, TypeError):
+                    conf_value = 0.0
+
+                if text and text.strip():
+                    text_parts.append(text.strip())
+                    confidences.append(conf_value)
+
+            text = "\n".join(text_parts)
+            confidence = float(np.mean(confidences)) if confidences else 0.0
+
+            return {"text": text, "confidence": confidence}
+        except Exception as e:
+            return {"text": "", "confidence": 0.0, "error": str(e)}
 
     def _run_tesseract(self, image: np.ndarray) -> Dict[str, Any]:
         oem = self.tesser_config.get("oem", 3)
@@ -292,27 +371,46 @@ class HybridOCREngine:
 
     def _run_trocr(self, image: np.ndarray) -> Dict[str, Any]:
         if self._trocr_model is None or self._trocr_processor is None:
-            return {"text": "", "confidence": 0.0}
+            return {"text": "", "confidence": 0.0, "error": "model not loaded"}
+
+        import logging
+        logger = logging.getLogger("LibraryOCR")
 
         try:
-            pil_img = self._numpy_to_pil(image)
+            import torch
+            from PIL import Image
+            pil_img = Image.fromarray(image)
 
-            pixel_values = self._trocr_processor(
-                pil_img, return_tensors="pt"
-            ).pixel_values
-            pixel_values = pixel_values.to(self._trocr_device_name)
-
-            generated_ids = self._trocr_model.generate(
-                pixel_values, max_new_tokens=256
+            inputs = self._trocr_processor(
+                images=pil_img, return_tensors="pt"
             )
+
+            device = getattr(self, '_trocr_device_name', 'cpu')
+            for key in inputs:
+                if hasattr(inputs[key], 'to'):
+                    inputs[key] = inputs[key].to(device)
+
+            with torch.no_grad():
+                generated_ids = self._trocr_model.generate(
+                    **inputs,
+                    max_new_tokens=256,
+                    num_beams=4,
+                    early_stopping=True,
+                )
+
             text = self._trocr_processor.batch_decode(
                 generated_ids, skip_special_tokens=True
             )[0]
 
+            if not text or not text.strip():
+                return {"text": "", "confidence": 0.0, "error": "empty result"}
+
+            logger.info(f"TrOCR result: '{text[:50]}...'")
             return {"text": text, "confidence": 0.92}
 
-        except Exception:
-            return {"text": "", "confidence": 0.0}
+        except Exception as e:
+            logger.error(f"TrOCR error: {e}")
+            return {"text": "", "confidence": 0.0, "error": str(e)}
 
     def _run_glmocr(self, image: np.ndarray) -> Dict[str, Any]:
         if not self.glm_config.get("enabled", False):

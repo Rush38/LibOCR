@@ -74,6 +74,7 @@ def process_single_image(
     output_dir,
     debug_dir,
     logger,
+    config,
     debug_mode=False,
     max_retries=3,
     retry_delay=2,
@@ -148,30 +149,28 @@ def process_single_image(
             trocr = result_data["confidence"]["trocr"]
             glm = result_data["confidence"]["glmocr"]
 
-            if overall >= 0.6:
-                print_colored(
-                    f"[ OK ] {filename} - {elapsed:.1f}s "
-                    f"(E:{easy:.0%} T:{tess:.0%} Tr:{trocr:.0%} G:{glm:.0%} -> {overall:.0%})",
-                    Colors.GREEN,
-                )
-            else:
-                print_colored(
-                    f"[WARN] {filename} — низкая уверенность ({overall:.0%}), "
-                    "проверьте результат",
-                    Colors.YELLOW,
-                )
+            text_type = result_data.get("text_type", "unknown")
+            primary_engine = result_data.get("primary_engine", "tesseract")
+            library_terms_count = len(result_data.get("library_terms", []))
+            raw_preview = result_data.get("raw_text", "")[:80].replace("\n", " ")
+
+            status = "OK" if overall >= 0.6 else "WARN"
+            color = Colors.GREEN if overall >= 0.6 else Colors.YELLOW
+
+            print_colored(
+                f"[{status}] {filename} | {text_type} | {primary_engine} | {library_terms_count} терминов | "
+                f"T:{tess:.0%} Tr:{trocr:.0%} | {elapsed:.1f}s",
+                color,
+            )
+            if raw_preview.strip():
+                print_colored(f"     Text: {raw_preview}...", Colors.BLUE)
 
             return {
                 "file": filename,
                 "detected_angle": result_data["detected_angle"],
                 "corrected": result_data["corrected"],
-                "reader_names": "|".join(result_data["reader_names"]),
-                "dates": "|".join(result_data["dates"]),
-                "possible_dates": "|".join(result_data["possible_dates"]),
-                "inventory_numbers": "|".join(
-                    result_data["inventory_numbers"]
-                ),
-                "possible_stamps": "|".join(result_data["possible_stamps"]),
+                "text_type": result_data.get("text_type", "unknown"),
+                "primary_engine": result_data.get("primary_engine", "tesseract"),
                 "library_terms": "|".join(result_data.get("library_terms", [])),
                 "confidence": f"{overall:.0%}",
                 "language": result_data["language"],
@@ -192,11 +191,6 @@ def process_single_image(
                     "file": filename,
                     "detected_angle": "",
                     "corrected": "",
-                    "reader_names": "",
-                    "dates": "",
-                    "possible_dates": "",
-                    "inventory_numbers": "",
-                    "possible_stamps": "",
                     "confidence": "ERROR",
                     "language": "",
                     "warnings": str(e),
@@ -275,6 +269,20 @@ def main():
         else:
             images = all_images
 
+        skipped_existing = 0
+        images_to_process = []
+        for img_path in images:
+            json_path = make_output_subdir(img_path, input_dir, output_dir).with_suffix(".json")
+            if json_path.exists():
+                skipped_existing += 1
+            else:
+                images_to_process.append(img_path)
+        if skipped_existing > 0:
+            print_colored(
+                f"[INFO] Skipped {skipped_existing} files with existing results", Colors.BLUE
+            )
+        images = images_to_process
+
     if not images:
         print_colored(
             f"[WARN] Нет изображений в {input_dir}", Colors.YELLOW
@@ -317,15 +325,16 @@ def main():
                 output_dir,
                 debug_dir,
                 logger,
+                config,
                 debug_mode=args.debug,
                 max_retries=max_retries,
                 retry_delay=retry_delay,
             )
             results.append(result)
             if result["status"] == "OK":
-                batch_state.mark_completed(result["file"], result)
+                batch_state.mark_completed(img_path)
             else:
-                batch_state.mark_failed(result["file"], result["warnings"])
+                batch_state.mark_failed(img_path, result["warnings"])
             pbar.update(1)
             memory_cleanup()
 
@@ -338,15 +347,13 @@ def main():
     csv_path = output_dir / "summary_report.csv"
     with open(csv_path, "w", encoding="utf-8-sig") as f:
         f.write(
-            "file;detected_angle;corrected;reader_names;dates;"
-            "possible_dates;inventory_numbers;possible_stamps;"
+            "file;detected_angle;corrected;text_type;primary_engine;"
             "library_terms;confidence;language;warnings\n"
         )
         for r in results:
             f.write(
                 f"{r['file']};{r['detected_angle']};{r['corrected']};"
-                f"{r['reader_names']};{r['dates']};{r['possible_dates']};"
-                f"{r['inventory_numbers']};{r['possible_stamps']};"
+                f"{r.get('text_type', '')};{r.get('primary_engine', '')};"
                 f"{r.get('library_terms', '')};"
                 f"{r['confidence']};{r['language']};{r['warnings']}\n"
             )
@@ -371,6 +378,12 @@ def main():
             rf.write(f"Run finished at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             rf.write(f"Processed: {ok_count}/{len(images)}, errors: {err_count}, time: {total_elapsed:.1f}s\n")
             rf.write(f"Results: {output_dir.relative_to(root)}\n")
+    except Exception:
+        pass
+
+    try:
+        import os
+        os.startfile(output_dir)
     except Exception:
         pass
 

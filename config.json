@@ -30,10 +30,11 @@
       "local_models_dir": "models"
     },
     "glmocr": {
-      "enabled": true,
+      "enabled": false,
       "model_name": "zai-org/GLM-OCR",
       "device": "auto",
-      "local_models_dir": "models"
+      "local_models_dir": "models",
+      "note": "model incompatible with transformers pipeline, requires manual setup"
     }
   },
   "preprocessing": {

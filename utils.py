@@ -84,7 +84,11 @@ def setup_logging(config):
 
 
 def print_colored(msg, color=Colors.BLUE):
-    print(f"{color}{msg}{Style.RESET_ALL}")
+    try:
+        print(f"{color}{msg}{Style.RESET_ALL}")
+    except UnicodeEncodeError:
+        safe = msg.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+        print(f"{color}{safe}{Style.RESET_ALL}")
 
 
 def get_image_files(directory):
@@ -143,10 +147,6 @@ def save_txt_output(path, data):
     lines.append(f"Confidence: {data.get('confidence', {}).get('overall', 0):.0%}")
     lines.append(f"Time: {data.get('processing_time_sec', 0):.1f}s")
     lines.append(f"Angle: {data.get('detected_angle', 0):.1f} deg, corrected: {data.get('corrected', False)}")
-    lines.append(sep)
-    lines.append("READERS:")
-    for name in data.get("reader_names", []):
-        lines.append(f"  {name}")
     lines.append(sep)
     lines.append("TEXT:")
     lines.append(data.get("raw_text", ""))

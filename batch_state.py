@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 
 class BatchState:
@@ -15,41 +15,39 @@ class BatchState:
                     return json.load(f)
             except Exception:
                 pass
-        return {"completed": [], "failed": [], "total": 0, "started": False}
+        return {"completed": [], "failed": [], "total": 0}
 
     def save(self):
         with open(self.state_file, "w", encoding="utf-8-sig") as f:
             json.dump(self.data, f, ensure_ascii=False, indent=2)
 
-    def mark_completed(self, filename: str, result_data: Dict):
+    def mark_completed(self, filepath):
         self.data.setdefault("completed", [])
-        if filename not in self.data["completed"]:
-            self.data["completed"].append(filename)
+        key = str(filepath)
+        if key not in self.data["completed"]:
+            self.data["completed"].append(key)
         self.data["total"] = len(self.data["completed"]) + len(
             self.data.get("failed", [])
         )
         self.save()
 
-    def mark_failed(self, filename: str, error: str):
+    def mark_failed(self, filepath, error):
         self.data.setdefault("failed", [])
-        if filename not in [f["file"] for f in self.data["failed"]]:
-            self.data["failed"].append({"file": filename, "error": error})
+        key = str(filepath)
+        if key not in [f["file"] for f in self.data["failed"]]:
+            self.data["failed"].append({"file": key, "error": error})
         self.save()
 
-    def is_completed(self, filename: str) -> bool:
-        return filename in self.data.get("completed", [])
+    def is_completed(self, filepath):
+        return str(filepath) in self.data.get("completed", [])
 
-    def get_remaining(self, all_files: List[Path]) -> List[Path]:
+    def get_remaining(self, all_files):
         completed = set(self.data.get("completed", []))
-        return [f for f in all_files if f.name not in completed]
+        return [f for f in all_files if str(f) not in completed]
 
     def reset(self):
-        self.data = {"completed": [], "failed": [], "total": 0, "started": False}
+        self.data = {"completed": [], "failed": [], "total": 0}
         self.save()
-
-
-def save_batch_state(output_dir: Path, state: BatchState):
-    state.save()
 
 
 def load_batch_state(output_dir: Path) -> BatchState:

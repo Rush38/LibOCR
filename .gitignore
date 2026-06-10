@@ -43,3 +43,9 @@ output_texts/
 logs/
 debug/
 error_reports/
+
+# Python packages (portable)
+Lib/
+Library/
+Scripts/
+~torch/

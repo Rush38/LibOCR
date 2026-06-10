@@ -3,16 +3,28 @@
 ## Core Goal
 Автономный оффлайн OCR для распознавания текста с фотографий **библиотечных карточек**. JPG/PNG, печатный + рукописный текст, штампы, линии, углы поворота 0–270°. **Всё в raw_text** — ничего не удаляется, сомнительные элементы помечаются.
 
+## Processing Strategy
+1. **Определение типа текста** — анализ изображения для детекции рукописный/печатный
+2. **Приоритетный движок** — на основе типа: TrOCR для рукописного, Tesseract/EasyOCR для печатного
+3. **Все результаты в одном файле** — каждый движок отображается в raw_text с тегом
+4. **primary_engine** — поле указывающее какой движок выбран как основной
+
 ## Hard Constraints
 - **Offline mode only** — open-source движки (EasyOCR + Tesseract + TrOCR)
-- **GPU capable** with large models (2.5GB+)
+- **GPU capable** with large models (2.5GB+), требуется CUDA
 - **Portability** (flash drive compatible)
 - **All paths relative** via `pathlib`
 - **`config.json`** — loads and used, NOT hardcoded
 - **Russian language** support
-- **Python 3.11+** compatible
+- **Python 3.11-3.12** compatible (для GPU требуется Python 3.11 или 3.12)
 
-## OCR Engines (4 движка)
+## GPU Требования
+- NVIDIA GPU с CUDA поддержкой (RTX 3080 тестировано, 8GB+ VRAM)
+- NVIDIA Driver (любая последняя версия)
+- CUDA Toolkit 12.x
+- **Важно**: Python 3.11 или 3.12 — PyTorch с CUDA не поддерживает Python 3.13+
+
+## OCR Engines (3 движка, GLM-OCR отключён)
 
 ### EasyOCR
 - Печатный текст, русский/английский
@@ -34,11 +46,10 @@
 - Загружается через `VisionEncoderDecoderModel` + `TrOCRProcessor`
 - **Local model support**: модель скачивается в `models/` через `snapshot_download`, используется локально без повторной загрузки
 
-### GLM-OCR (HuggingFace, optional local)
-- Модель: `zai-org/GLM-OCR` или аналогичная Vision-OCR модель с HuggingFace
-- Скачивается в `models/` при первом использовании
-- Используется как 4-й OCR движок для повышения accuracy
-- Lazy-loaded, GPU-auto (cuda если доступна)
+### GLM-OCR (HuggingFace, **ОТКЛЮЧЁН**)
+- Модель: `zai-org/GLM-OCR` — **НЕсовместим** с transformers pipeline (задача "ocr" недоступна)
+- Требует ручной настройки или альтернативной модели
+- Пока отключён, 3 движка обеспечивают достаточное качество
 - Конфигурируется в `config.json` -> `ocr.glmocr`
 
 ## Dictionary System
@@ -62,11 +73,16 @@
 - Обрабатываются изображения во всех подпапках `input_images/` (рекурсивно)
 - Структура папок сохраняется: `input_images/subfolder/image.jpg` → `output_texts/subfolder/image.json`
 - Иерархия директорий воспроизводится в `output_texts/`
+- **Skip already processed**: если JSON-файл результата уже существует — изображение пропускается (даже без `--resume`)
 
 ## Error Tracking
 - При ошибке файл изображения копируется в `error_reports/<filename>_<timestamp>_error.txt`
 - Содержит: имя файла, путь, timestamp, текст ошибки
 - Позволяет повторно обработать проблемные файлы
+
+## Auto-open Results Folder
+- После завершения обработки автоматически открывается папка `output_texts/` (Windows: `os.startfile`)
+- Позволяет сразу просмотреть результаты без ручного поиска папки
 
 ## Preprocessing Pipeline
 1. Denoise (`fastNlMeansDenoisingColored`)
@@ -151,7 +167,7 @@ Also produces:
 - [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, `error_reports/`, `~/.cache/huggingface/`
 
 ## Key Decisions
-- Hybrid OCR: EasyOCR + Tesseract + TrOCR + GLM-OCR (parallel ThreadPoolExecutor, 4 workers)
+- Hybrid OCR: EasyOCR + Tesseract + TrOCR (GLM-OCR отключён, параллельно 3 воркера)
 - TrOCR: `Kansallisarkisto/cyrillic-large-handwritten` — CER=4%, 0.6B, Apache 2.0, lazy-loaded, GPU-auto
 - Postprocessor marks doubtful items but NEVER deletes from `raw_text`
 - Dictionary: `library_terms[]` + `fuzzy_corrections[]` from `dictionaries/library_dictionary.json`
