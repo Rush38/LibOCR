@@ -514,7 +514,7 @@ def main():
         dict_path = get_project_root() / "models" / "ru_dictionary.txt"
         corr = LanguageModelCorrector(bigrams_path, dict_path if dict_path.exists() else None)
         post_processor.register_language_corrector(corr)
-        logger.info("LanguageModelCorrector: loaded")
+        logger.debug("LanguageModelCorrector: loaded")
     except Exception as e:
         logger.warning(f"LanguageModelCorrector: not loaded ({e})")
 

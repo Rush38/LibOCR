@@ -136,7 +136,7 @@ class HybridOCREngine:
                 load_from = model_name
 
             logger = logging.getLogger("LibraryOCR")
-            logger.info(f"TrOCR: loading model from {load_from}")
+            logger.debug(f"TrOCR: loading model from {load_from}")
 
             self._trocr_processor = None
             self._trocr_model = VisionEncoderDecoderModel.from_pretrained(load_from)
@@ -564,7 +564,7 @@ class HybridOCREngine:
             if not text or not text.strip():
                 return {"text": "", "confidence": 0.0, "error": "empty result"}
 
-            logger.info(f"TrOCR result: '{text[:50]}...'")
+            logger.debug(f"TrOCR result: '{text[:50]}...'")
             return {"text": text, "confidence": 0.92}
 
         except Exception as e:

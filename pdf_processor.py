@@ -45,7 +45,7 @@ class PDFProcessor:
                 images.append(img)
 
             doc.close()
-            logger.info(f"PDF {pdf_path.name}: {len(images)} pages extracted")
+            logger.debug(f"PDF {pdf_path.name}: {len(images)} pages extracted")
             return images
         except Exception as e:
             logger.error(f"PDF extraction failed for {pdf_path.name}: {e}")
