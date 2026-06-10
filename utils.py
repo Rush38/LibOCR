@@ -140,17 +140,64 @@ def save_txt_output(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = []
     sep = "=" * 60
+    ssep = "-" * 40
+
+    conf = data.get("confidence", {})
+    engine_times = data.get("engine_times", {})
+    alternatives = data.get("alternatives", {})
+    best = data.get("best_engine", {})
 
     lines.append(sep)
-    lines.append(f"File: {data.get('filename', 'unknown')}")
-    lines.append(f"Type: {data.get('text_type', 'unknown')}")
-    lines.append(f"Primary engine: {data.get('primary_engine', 'unknown')}")
-    lines.append(f"Language: {data.get('language', 'unknown')}")
-    lines.append(f"Confidence: {data.get('confidence', {}).get('overall', 0):.0%}")
-    lines.append(f"Time: {data.get('processing_time_sec', 0):.1f}s")
-    lines.append(f"Angle: {data.get('detected_angle', 0):.1f} deg, corrected: {data.get('corrected', False)}")
+    lines.append(f"Файл: {data.get('filename', 'unknown')}")
+    lines.append(f"Тип текста: {data.get('text_type', 'unknown')}")
+    lines.append(f"Тип документа: {data.get('document_type', 'unknown')}")
+    lines.append(f"Язык: {data.get('language', 'unknown')}")
+    lines.append(f"Общая уверенность: {conf.get('overall', 0):.0%}")
+    lines.append(f"Общее время: {data.get('processing_time_sec', 0):.1f}с")
+    lines.append(f"Угол: {data.get('detected_angle', 0):.1f}°, коррекция: {data.get('corrected', False)}")
     lines.append(sep)
-    lines.append("TEXT:")
+
+    lines.append("ОЦЕНКА МОДЕЛЕЙ (0-100):")
+    model_names = {"easyocr": "EasyOCR", "tesseract": "Tesseract", "trocr": "TrOCR",
+                   "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR"}
+    sorted_models = sorted(
+        [(k, v) for k, v in conf.items() if k != "overall" and v > 0],
+        key=lambda x: -x[1]
+    )
+    for i, (model_key, score) in enumerate(sorted_models, 1):
+        name = model_names.get(model_key, model_key)
+        et = engine_times.get(model_key, {})
+        dur = et.get("duration", 0) if isinstance(et, dict) else 0
+        marker = " ★" if best.get("name") == model_key else ""
+        lines.append(f"  {i}. {name}: {score*100:.0f}/100 (время: {dur:.1f}с){marker}")
+    lines.append(sep)
+
+    lines.append("РЕЗУЛЬТАТЫ ВСЕХ МОДЕЛЕЙ:")
+    lines.append("")
+    for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr"]:
+        alt_text = alternatives.get(f"{model_key}_text", "")
+        if not alt_text or not alt_text.strip():
+            continue
+        name = model_names.get(model_key, model_key)
+        score = conf.get(model_key, 0)
+        et = engine_times.get(model_key, {})
+        start_t = et.get("start", "?") if isinstance(et, dict) else "?"
+        end_t = et.get("end", "?") if isinstance(et, dict) else "?"
+        dur = et.get("duration", 0) if isinstance(et, dict) else 0
+
+        lines.append(ssep)
+        lines.append(f"Модель: {name}")
+        lines.append(f"Оценка: {score*100:.0f}/100")
+        lines.append(f"Время начала: {start_t}")
+        lines.append(f"Время завершения: {end_t}")
+        lines.append(f"Длительность: {dur:.1f}с")
+        lines.append(ssep)
+        lines.append("Определенный текст:")
+        lines.append(alt_text.strip()[:500])
+        lines.append("")
+
+    lines.append(sep)
+    lines.append("ПОЛНЫЙ ТЕКСТ:")
     display_text = data.get("formatted_text", data.get("raw_text", ""))
     lines.append(display_text)
     lines.append(sep)
@@ -187,30 +234,71 @@ def save_txt_output(path, data):
 def save_doc_output(path, data):
     try:
         from docx import Document
-        from docx.shared import Pt, Inches
+        from docx.shared import Pt, Inches, RGBColor
         doc = Document()
         style = doc.styles["Normal"]
         font = style.font
         font.name = "Arial"
         font.size = Pt(11)
 
-        doc.add_heading(f"LibOCR Result", 0)
-        doc.add_heading("Metadata", 1)
+        conf = data.get("confidence", {})
+        engine_times = data.get("engine_times", {})
+        alternatives = data.get("alternatives", {})
+        best = data.get("best_engine", {})
+
+        doc.add_heading(f"LibOCR - {data.get('filename', 'unknown')}", 0)
+
+        doc.add_heading("Метаданные", 1)
         meta = [
-            ("File", data.get("filename", "unknown")),
-            ("Type", data.get("text_type", "unknown")),
-            ("Engine", data.get("primary_engine", "unknown")),
-            ("Language", data.get("language", "unknown")),
-            ("Confidence", f"{data.get('confidence', {}).get('overall', 0):.0%}"),
-            ("Time", f"{data.get('processing_time_sec', 0):.1f}s"),
-            ("Angle", f"{data.get('detected_angle', 0):.1f} deg"),
+            ("Тип текста", data.get("text_type", "unknown")),
+            ("Тип документа", data.get("document_type", "unknown")),
+            ("Язык", data.get("language", "unknown")),
+            ("Общая уверенность", f"{conf.get('overall', 0):.0%}"),
+            ("Общее время", f"{data.get('processing_time_sec', 0):.1f}с"),
         ]
         for label, value in meta:
             p = doc.add_paragraph()
             p.add_run(f"{label}: ").bold = True
             p.add_run(str(value))
 
-        doc.add_heading("Text", 1)
+        doc.add_heading("Оценка моделей (0-100)", 1)
+        model_names = {"easyocr": "EasyOCR", "tesseract": "Tesseract", "trocr": "TrOCR",
+                       "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR"}
+        sorted_models = sorted(
+            [(k, v) for k, v in conf.items() if k != "overall" and v > 0],
+            key=lambda x: -x[1]
+        )
+        for model_key, score in sorted_models:
+            name = model_names.get(model_key, model_key)
+            et = engine_times.get(model_key, {})
+            dur = et.get("duration", 0) if isinstance(et, dict) else 0
+            marker = " ★" if best.get("name") == model_key else ""
+            p = doc.add_paragraph(f"{name}: {score*100:.0f}/100 (время: {dur:.1f}с){marker}")
+
+        doc.add_heading("Результаты всех моделей", 1)
+        for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr"]:
+            alt_text = alternatives.get(f"{model_key}_text", "")
+            if not alt_text or not alt_text.strip():
+                continue
+            name = model_names.get(model_key, model_key)
+            score = conf.get(model_key, 0)
+            et = engine_times.get(model_key, {})
+            start_t = et.get("start", "?") if isinstance(et, dict) else "?"
+            end_t = et.get("end", "?") if isinstance(et, dict) else "?"
+            dur = et.get("duration", 0) if isinstance(et, dict) else 0
+
+            doc.add_heading(name, 2)
+            p = doc.add_paragraph()
+            p.add_run("Оценка: ").bold = True
+            p.add_run(f"{score*100:.0f}/100")
+            p = doc.add_paragraph()
+            p.add_run("Время: ").bold = True
+            p.add_run(f"{start_t} - {end_t} ({dur:.1f}с)")
+            p = doc.add_paragraph()
+            p.add_run("Текст: ").bold = True
+            doc.add_paragraph(alt_text.strip()[:500])
+
+        doc.add_heading("Полный текст", 1)
         doc.add_paragraph(data.get("formatted_text", data.get("raw_text", "")))
 
         if data.get("library_terms"):
@@ -246,22 +334,63 @@ def save_doc_output(path, data):
 
 
 def save_md_output(path, data):
+    conf = data.get("confidence", {})
+    engine_times = data.get("engine_times", {})
+    alternatives = data.get("alternatives", {})
+    best = data.get("best_engine", {})
+    model_names = {"easyocr": "EasyOCR", "tesseract": "Tesseract", "trocr": "TrOCR",
+                   "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR"}
+
     sep = "---"
     parts = [
-        f"# LibOCR Result: {data.get('filename', 'unknown')}",
+        f"# LibOCR: {data.get('filename', 'unknown')}",
         sep,
-        "## Metadata",
-        f"- **Type:** {data.get('text_type', 'unknown')}",
-        f"- **Primary engine:** {data.get('primary_engine', 'unknown')}",
-        f"- **Language:** {data.get('language', 'unknown')}",
-        f"- **Confidence:** {data.get('confidence', {}).get('overall', 0):.0%}",
-        f"- **Time:** {data.get('processing_time_sec', 0):.1f}s",
-        f"- **Angle:** {data.get('detected_angle', 0):.1f} deg",
-        f"- **Corrected:** {data.get('corrected', False)}",
+        "## Метаданные",
+        f"- **Тип текста:** {data.get('text_type', 'unknown')}",
+        f"- **Тип документа:** {data.get('document_type', 'unknown')}",
+        f"- **Язык:** {data.get('language', 'unknown')}",
+        f"- **Общая уверенность:** {conf.get('overall', 0):.0%}",
+        f"- **Общее время:** {data.get('processing_time_sec', 0):.1f}с",
         sep,
-        "## Text",
-        data.get("formatted_text", data.get("raw_text", "")),
+        "## Оценка моделей (0-100)",
     ]
+    sorted_models = sorted(
+        [(k, v) for k, v in conf.items() if k != "overall" and v > 0],
+        key=lambda x: -x[1]
+    )
+    for i, (model_key, score) in enumerate(sorted_models, 1):
+        name = model_names.get(model_key, model_key)
+        et = engine_times.get(model_key, {})
+        dur = et.get("duration", 0) if isinstance(et, dict) else 0
+        marker = " ★" if best.get("name") == model_key else ""
+        parts.append(f"{i}. **{name}**: {score*100:.0f}/100 (время: {dur:.1f}с){marker}")
+
+    for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr"]:
+        alt_text = alternatives.get(f"{model_key}_text", "")
+        if not alt_text or not alt_text.strip():
+            continue
+        name = model_names.get(model_key, model_key)
+        score = conf.get(model_key, 0)
+        et = engine_times.get(model_key, {})
+        start_t = et.get("start", "?") if isinstance(et, dict) else "?"
+        end_t = et.get("end", "?") if isinstance(et, dict) else "?"
+        dur = et.get("duration", 0) if isinstance(et, dict) else 0
+
+        parts += [
+            sep,
+            f"## Модель: {name}",
+            f"- **Оценка:** {score*100:.0f}/100",
+            f"- **Время начала:** {start_t}",
+            f"- **Время завершения:** {end_t}",
+            f"- **Длительность:** {dur:.1f}с",
+            "",
+            "**Определенный текст:**",
+            f"```",
+            alt_text.strip()[:500],
+            f"```",
+        ]
+
+    parts += [sep, "## Полный текст", data.get("formatted_text", data.get("raw_text", ""))]
     if data.get("library_terms"):
         parts += [sep, "## Library Terms"]
         parts += [f"- {t}" for t in data["library_terms"]]
