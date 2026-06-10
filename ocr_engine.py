@@ -231,7 +231,7 @@ class HybridOCREngine:
     def recognize(self, image: np.ndarray) -> Dict[str, Any]:
         timeout = self.config["processing"]["timeout_engine"]
         warnings: List[str] = []
-        engine_times: Dict[str, float] = {}
+        engine_times: Dict[str, Dict] = {}
         results: Dict[str, Dict] = {}
 
         _ = self.easyocr_reader
@@ -240,34 +240,46 @@ class HybridOCREngine:
 
         try:
             import time as tmod
+            import datetime as dt
 
             if cascade:
                 t0 = tmod.time()
+                t0_str = dt.datetime.now().strftime("%H:%M:%S")
                 easy_result = self._run_easyocr(image)
-                engine_times["easyocr"] = tmod.time() - t0
+                t1_str = dt.datetime.now().strftime("%H:%M:%S")
+                engine_times["easyocr"] = {"start": t0_str, "end": t1_str, "duration": round(tmod.time() - t0, 2)}
                 results["easyocr"] = easy_result
                 if easy_result.get("error"):
-                    warnings.append(f"EasyOCR: {easy_result['error']}")
+                    msg = f"EasyOCR: {easy_result['error']}"
+                    warnings.append(msg)
 
                 if not easy_result.get("text", "").strip() or easy_result.get("confidence", 0) < 0.3:
+                    t_fb = tmod.time()
                     easy_result2 = self._run_easyocr(image, paragraph=False)
                     if easy_result2.get("text", "").strip():
                         results["easyocr"] = easy_result2
-                        engine_times["easyocr"] += engine_times.get("easyocr", 0)
-
-                t1 = tmod.time()
-                tess_result = self._run_tesseract(image)
-                engine_times["tesseract"] = tmod.time() - t1
-                results["tesseract"] = tess_result
-                if tess_result.get("error"):
-                    warnings.append(f"Tesseract: {tess_result['error']}")
+                        engine_times["easyocr"]["duration"] = round(tmod.time() - t0, 2)
+                        engine_times["easyocr"]["fallback"] = True
 
                 t2 = tmod.time()
+                t2_str = dt.datetime.now().strftime("%H:%M:%S")
+                tess_result = self._run_tesseract(image)
+                t3_str = dt.datetime.now().strftime("%H:%M:%S")
+                engine_times["tesseract"] = {"start": t2_str, "end": t3_str, "duration": round(tmod.time() - t2, 2)}
+                results["tesseract"] = tess_result
+                if tess_result.get("error"):
+                    msg = f"Tesseract: {tess_result['error']}"
+                    warnings.append(msg)
+
+                t4 = tmod.time()
+                t4_str = dt.datetime.now().strftime("%H:%M:%S")
                 trocr_result = self._run_trocr(image)
-                engine_times["trocr"] = tmod.time() - t2
+                t5_str = dt.datetime.now().strftime("%H:%M:%S")
+                engine_times["trocr"] = {"start": t4_str, "end": t5_str, "duration": round(tmod.time() - t4, 2)}
                 results["trocr"] = trocr_result
                 if trocr_result.get("error"):
-                    warnings.append(f"TrOCR: {trocr_result['error']}")
+                    msg = f"TrOCR: {trocr_result['error']}"
+                    warnings.append(msg)
             else:
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     f_easy = executor.submit(self._run_easyocr, image)
@@ -282,18 +294,22 @@ class HybridOCREngine:
                         ("glmocr", f_glm, timeout * 2),
                     ]:
                         t0 = tmod.time()
+                        t_start = dt.datetime.now().strftime("%H:%M:%S")
                         try:
                             res = future.result(timeout=t_out)
-                            engine_times[name] = tmod.time() - t0
+                            dur = round(tmod.time() - t0, 2)
+                            engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": dur}
                             results[name] = res
                             if res.get("error"):
-                                warnings.append(f"{name.capitalize()}: {res['error']}")
+                                msg = f"{name.capitalize()}: {res['error']}"
+                                warnings.append(msg)
                         except FuturesTimeoutError:
-                            warnings.append(f"{name.capitalize()}: timeout")
-                            engine_times[name] = t_out
+                            warnings.append(f"{name.capitalize()}: timeout истекло ({t_out}с)")
+                            engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": t_out, "error": "timeout"}
                         except Exception as e:
-                            warnings.append(f"{name.capitalize()}: {str(e)}")
-                            engine_times[name] = tmod.time() - t0
+                            msg = f"{name.capitalize()}: {str(e)}"
+                            warnings.append(msg)
+                            engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": round(tmod.time() - t0, 2), "error": str(e)}
 
         except Exception as e:
             warnings.append(f"OCR: {str(e)}")

@@ -210,6 +210,7 @@ def process_single_image(
             glm = result_data["confidence"]["glmocr"]
 
             text_type = result_data.get("text_type", "unknown")
+            doc_type = result_data.get("document_type", "")
             primary_engine = result_data.get("primary_engine", "tesseract")
             best_engine = result_data.get("best_engine", {})
             engine_times = result_data.get("engine_times", {})
@@ -219,11 +220,22 @@ def process_single_image(
             status = "OK" if overall >= 0.6 else "WARN"
             color = Colors.GREEN if overall >= 0.6 else Colors.YELLOW
             best_name = best_engine.get("name", primary_engine)
-            et = engine_times.get(best_name, 0)
 
+            et_parts = []
+            for eng in ["easyocr", "tesseract", "trocr"]:
+                et = engine_times.get(eng, {})
+                if isinstance(et, dict):
+                    dur = et.get("duration", 0)
+                    et_parts.append(f"{eng[0].upper()}:{dur:.1f}s")
+                elif isinstance(et, (int, float)):
+                    et_parts.append(f"{eng[0].upper()}:{et:.1f}s")
+
+            et_str = " | ".join(et_parts) if et_parts else ""
+
+            doc_info = f" | {doc_type}" if doc_type else ""
             print_colored(
-                f"[{status}] {filename} | {text_type} | {primary_engine} | {library_terms_count} терминов | "
-                f"T:{tess:.0%} Tr:{trocr:.0%} | Лучший: {best_name} ({et:.1f}s) | {elapsed:.1f}s",
+                f"[{status}] {filename} | {text_type}{doc_info} | {library_terms_count} терминов | "
+                f"{et_str} | Лучший: {best_name} | Всего: {elapsed:.1f}s",
                 color,
             )
             if raw_preview.strip():
