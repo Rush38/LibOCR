@@ -151,7 +151,8 @@ def save_txt_output(path, data):
     lines.append(f"Angle: {data.get('detected_angle', 0):.1f} deg, corrected: {data.get('corrected', False)}")
     lines.append(sep)
     lines.append("TEXT:")
-    lines.append(data.get("raw_text", ""))
+    display_text = data.get("formatted_text", data.get("raw_text", ""))
+    lines.append(display_text)
     lines.append(sep)
     if data.get("library_terms"):
         lines.append("LIBRARY TERMS:")
@@ -210,7 +211,7 @@ def save_doc_output(path, data):
             p.add_run(str(value))
 
         doc.add_heading("Text", 1)
-        doc.add_paragraph(data.get("raw_text", ""))
+        doc.add_paragraph(data.get("formatted_text", data.get("raw_text", "")))
 
         if data.get("library_terms"):
             doc.add_heading("Library Terms", 1)
@@ -259,7 +260,7 @@ def save_md_output(path, data):
         f"- **Corrected:** {data.get('corrected', False)}",
         sep,
         "## Text",
-        data.get("raw_text", ""),
+        data.get("formatted_text", data.get("raw_text", "")),
     ]
     if data.get("library_terms"):
         parts += [sep, "## Library Terms"]

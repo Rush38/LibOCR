@@ -102,6 +102,7 @@ class PostProcessor:
             raw_parts.append("[ШТАМПЫ] " + "; ".join(possible_stamps))
 
         full_raw_text = "\n\n".join(raw_parts)
+        formatted_text = self._format_text_structure(full_raw_text)
 
         return {
             "filename": filename,
@@ -115,6 +116,7 @@ class PostProcessor:
             "library_terms": library_terms,
             "fuzzy_corrections": fuzzy_corrections,
             "raw_text": full_raw_text,
+            "formatted_text": formatted_text,
             "possible_errors": possible_errors,
             "alternatives": {
                 "easyocr_text": easy_text,
@@ -325,3 +327,55 @@ class PostProcessor:
                     f"строка {i+1}: расхождение между движками"
                 )
         return errors
+
+    def _format_text_structure(self, raw_text: str) -> str:
+        lines = raw_text.split("\n")
+        formatted = []
+        buffer = []
+
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped:
+                if buffer:
+                    formatted.append(" ".join(buffer))
+                    buffer = []
+                continue
+
+            if self._is_heading_candidate(stripped, lines, idx):
+                if buffer:
+                    formatted.append(" ".join(buffer))
+                    buffer = []
+                formatted.append(f"\n## {stripped}\n")
+                continue
+
+            if self._is_list_item(stripped):
+                if buffer:
+                    formatted.append(" ".join(buffer))
+                    buffer = []
+                formatted.append(f"  - {stripped}")
+                continue
+
+            buffer.append(stripped)
+
+        if buffer:
+            formatted.append(" ".join(buffer))
+
+        return "\n\n".join(formatted)
+
+    @staticmethod
+    def _is_heading_candidate(line: str, all_lines: list, idx: int) -> bool:
+        if len(line) > 60:
+            return False
+        if line.isupper() and len(line) > 3:
+            return True
+        if all(c.isupper() or c in " .-–—:!?" for c in line.strip()) and len(line.strip()) > 2:
+            return True
+        if len(line) < 40 and idx + 1 < len(all_lines):
+            next_line = all_lines[idx + 1].strip()
+            if len(next_line) > len(line) * 2 and not next_line.isupper():
+                return True
+        return False
+
+    @staticmethod
+    def _is_list_item(line: str) -> bool:
+        return any(line.startswith(p) for p in ["- ", "* ", "• ", "1.", "2.", "3.", "4.", "5.", "– ", "— "])

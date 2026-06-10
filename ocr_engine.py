@@ -1,9 +1,12 @@
 import pytesseract
 import numpy as np
 import cv2
+import logging
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Dict, Any, Optional, List
 from pathlib import Path
+
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 
 class HybridOCREngine:
@@ -104,14 +107,12 @@ class HybridOCREngine:
             return
 
         try:
-            import logging
-            logging.getLogger("transformers").setLevel(logging.ERROR)
-
             from transformers import (
                 TrOCRProcessor,
                 VisionEncoderDecoderModel,
             )
             import torch
+            logging.getLogger("transformers").setLevel(logging.CRITICAL)
 
             device = self._get_trocr_device()
             model_name = self._trocr_model_name
@@ -119,7 +120,6 @@ class HybridOCREngine:
 
             local_path = self._get_model_dir(model_name, local_dir)
             if not local_path:
-                import logging
                 logger = logging.getLogger("LibraryOCR")
                 logger.info(f"TrOCR: model not found locally, downloading...")
                 local_path = self._download_model_locally(model_name, local_dir)
@@ -129,7 +129,6 @@ class HybridOCREngine:
             else:
                 load_from = model_name
 
-            import logging
             logger = logging.getLogger("LibraryOCR")
             logger.info(f"TrOCR: loading model from {load_from}")
 
@@ -137,22 +136,20 @@ class HybridOCREngine:
             self._trocr_model = VisionEncoderDecoderModel.from_pretrained(load_from)
             self._trocr_model.to(device)
             self._trocr_model.eval()
+            self._trocr_model.generation_config.max_new_tokens = 256
             logger.info(f"TrOCR: model loaded successfully, device={device}")
             self._trocr_device_name = device
 
         except ImportError as e:
-            import logging
             logging.getLogger("LibraryOCR").warning(
                 f"TrOCR: transformers not installed ({e}). Install with: pip install transformers torch"
             )
             self._trocr_model = None
             self._trocr_processor = None
         except Exception as e:
-            import logging
             logger = logging.getLogger("LibraryOCR")
             logger.error(f"TrOCR: FAILED to load model ({e})", exc_info=True)
             self._trocr_model = None
-            self._trocr_processor = None
             self._trocr_processor = None
 
     def _init_glmocr(self):
@@ -405,8 +402,6 @@ class HybridOCREngine:
             import torch
             from PIL import Image
             pil_img = Image.fromarray(image)
-
-            self._trocr_model.generation_config.max_length = 256
 
             inputs = self._trocr_processor(
                 images=pil_img, return_tensors="pt"
