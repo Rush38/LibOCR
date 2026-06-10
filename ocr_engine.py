@@ -255,23 +255,19 @@ class HybridOCREngine:
                         results["easyocr"] = easy_result2
                         engine_times["easyocr"] += engine_times.get("easyocr", 0)
 
-                easy_conf = results["easyocr"].get("confidence", 0.0)
-                if easy_conf < 0.7:
-                    t1 = tmod.time()
-                    tess_result = self._run_tesseract(image)
-                    engine_times["tesseract"] = tmod.time() - t1
-                    results["tesseract"] = tess_result
-                    if tess_result.get("error"):
-                        warnings.append(f"Tesseract: {tess_result['error']}")
+                t1 = tmod.time()
+                tess_result = self._run_tesseract(image)
+                engine_times["tesseract"] = tmod.time() - t1
+                results["tesseract"] = tess_result
+                if tess_result.get("error"):
+                    warnings.append(f"Tesseract: {tess_result['error']}")
 
-                tess_conf = results.get("tesseract", {}).get("confidence", 0.0) if "tesseract" in results else 0.0
-                if max(easy_conf, tess_conf) < 0.6:
-                    t2 = tmod.time()
-                    trocr_result = self._run_trocr(image)
-                    engine_times["trocr"] = tmod.time() - t2
-                    results["trocr"] = trocr_result
-                    if trocr_result.get("error"):
-                        warnings.append(f"TrOCR: {trocr_result['error']}")
+                t2 = tmod.time()
+                trocr_result = self._run_trocr(image)
+                engine_times["trocr"] = tmod.time() - t2
+                results["trocr"] = trocr_result
+                if trocr_result.get("error"):
+                    warnings.append(f"TrOCR: {trocr_result['error']}")
             else:
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     f_easy = executor.submit(self._run_easyocr, image)
