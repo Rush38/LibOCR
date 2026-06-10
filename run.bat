@@ -57,13 +57,7 @@ if not exist "%IN%" (
 echo LibOCR starting...
 echo Input: %IN%
 echo.
-
-echo [INFO] Проверка зависимостей...
-%PYTHON_EXE% %PYTHON_ARGS% "%ROOT%main.py" --install 2>&1
-if errorlevel 1 (
-    echo [WARN] Установка зависимостей не удалась, продолжаем...
-)
-
+echo [INFO] Если движки не установлены, выполните: main.py --install
 echo.
 %PYTHON_EXE% %PYTHON_ARGS% "%ROOT%main.py" --input "%IN%" %DBG% %RES%
 
