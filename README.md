@@ -32,9 +32,19 @@
 ## Требования
 
 - Windows 10/11 (x64)
-- **Python 3.11 или 3.12** — версии 3.13+ не поддерживают CUDA
-- Tesseract OCR 5.3+ (для `rus_old` нужен пакет `rus_old.traineddata`)
-- GPU с CUDA (опционально, для EasyOCR, TrOCR, PaddleOCR, Surya OCR, docTR, GOT-OCR2)
+- Python 3.11 или 3.12 (версии 3.13+ не поддерживают CUDA)
+- Tesseract OCR 5.3+
+- GPU с CUDA (опционально, для 6 из 7 движков)
+
+## Установка
+
+```batch
+pip install -r requirements.txt
+python main.py --install
+run.bat
+```
+
+> **Важно:** TrOCR требует transformers<4.50.0. При проблемах: `pip install "transformers<4.50.0"`
 
 ## Быстрый старт
 
