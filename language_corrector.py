@@ -4,12 +4,22 @@ from typing import Dict, List, Optional, Tuple
 
 
 class LanguageModelCorrector:
-    def __init__(self, bigrams_path: Optional[Path] = None):
+    def __init__(self, bigrams_path: Optional[Path] = None, dict_path: Optional[Path] = None):
         self._bigrams: Dict[str, int] = {}
+        self._dict_words: set = set()
         if bigrams_path and bigrams_path.exists():
             try:
                 with open(bigrams_path, "r", encoding="utf-8") as f:
                     self._bigrams = json.load(f)
+            except Exception:
+                pass
+        if dict_path and dict_path.exists():
+            try:
+                with open(dict_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        word = line.strip().lower()
+                        if word and len(word) >= 3:
+                            self._dict_words.add(word)
             except Exception:
                 pass
 
@@ -19,12 +29,33 @@ class LanguageModelCorrector:
         if not word or len(word) < 3:
             return word, 0
 
+        lower = word.lower()
+        if self._dict_words and lower in self._dict_words:
+            return word, 0
+
         candidates = self._find_candidates(word, prev_word, next_word)
         if candidates:
             best = candidates[0]
             if best[1] > 0:
                 return best[0], best[1]
+
+        if self._dict_words:
+            dict_candidates = self._find_dict_candidates(lower)
+            if dict_candidates:
+                return dict_candidates[0][0], dict_candidates[0][1]
+
         return word, 0
+
+    def _find_dict_candidates(self, word: str) -> List[Tuple[str, int]]:
+        if not self._dict_words:
+            return []
+        results = []
+        for dict_word in self._dict_words:
+            dist = self._levenshtein(word, dict_word)
+            if dist <= 2:
+                results.append((dict_word, 5 - dist))
+        results.sort(key=lambda x: -x[1])
+        return results[:3]
 
     def _find_candidates(
         self, word: str, prev_word: Optional[str], next_word: Optional[str]

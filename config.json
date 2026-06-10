@@ -62,23 +62,12 @@
       "h_thresh": 0.4,
       "v_thresh": 0.3
     },
-    "stamp_suppression": {
-      "hsv_ranges": [
-        {"h": [100, 140], "s": [20, 255], "v": [20, 255]},
-        {"h": [140, 170], "s": [20, 255], "v": [20, 255]}
-      ],
-      "sat_reduction": 0.0
-    },
     "angle_correction": {
       "max_deviation": 45.0
     },
     "cache": {
       "enabled": true,
       "maxsize": 100
-    },
-    "stamp_detection": {
-      "enabled": true,
-      "min_area": 400
     }
   },
   "processing": {

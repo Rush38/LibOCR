@@ -127,7 +127,22 @@ class ImageProcessor:
             metadata["corrected"] = True
 
         metadata["detected_angle"] = angle
+
+        if abs(angle) < 0.5 or abs(angle) > max_dev:
+            if self._is_upside_down(img):
+                img = cv2.rotate(img, cv2.ROTATE_180)
+                metadata["corrected"] = True
+                metadata["detected_angle"] = 180.0
+
         return img
+
+    def _is_upside_down(self, img: np.ndarray) -> bool:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, binary = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY_INV)
+        h, w = binary.shape
+        top_half = binary[:h//2, :].sum()
+        bottom_half = binary[h//2:, :].sum()
+        return bottom_half > top_half * 1.5
 
     def _enhance_contrast(self, img: np.ndarray) -> np.ndarray:
         clahe_cfg = self.prep.get("clahe", {})

@@ -201,15 +201,12 @@ def process_single_image(
             )
 
             json_path = output_dir / f"{img_path.stem}.json"
-            txt_path = output_dir / f"{img_path.stem}.{output_format}"
+            base_path = output_dir / img_path.stem
 
             save_json_output(json_path, result_data)
-            if output_format == "txt":
-                save_txt_output(txt_path, result_data)
-            elif output_format == "doc":
-                save_doc_output(txt_path, result_data)
-            elif output_format == "md":
-                save_md_output(txt_path, result_data)
+            save_txt_output(base_path.with_suffix(".txt"), result_data)
+            save_doc_output(base_path.with_suffix(".doc"), result_data)
+            save_md_output(base_path.with_suffix(".md"), result_data)
 
             elapsed = time.time() - start_time
             overall = result_data["confidence"]["overall"]
@@ -348,6 +345,19 @@ def main():
         else:
             print_colored(f"  [OK] rus_old.traineddata уже есть", Colors.GREEN)
 
+        print_colored("[INFO] Загрузка русского словаря...", Colors.BLUE)
+        dict_url = "https://raw.githubusercontent.com/danakt/russian-words/master/russian.txt"
+        dict_dest = get_project_root() / "models" / "ru_dictionary.txt"
+        if not dict_dest.exists():
+            try:
+                import urllib.request
+                urllib.request.urlretrieve(dict_url, dict_dest)
+                print_colored(f"  [OK] Словарь -> {dict_dest}", Colors.GREEN)
+            except Exception as e:
+                print_colored(f"  [WARN] Не удалось загрузить словарь: {e}", Colors.YELLOW)
+        else:
+            print_colored(f"  [OK] Словарь уже есть", Colors.GREEN)
+
         print_colored("[OK] Установка завершена", Colors.GREEN)
         return
 
@@ -481,7 +491,8 @@ def main():
     try:
         from language_corrector import LanguageModelCorrector
         bigrams_path = get_project_root() / "models" / "ru_bigrams.json"
-        corr = LanguageModelCorrector(bigrams_path)
+        dict_path = get_project_root() / "models" / "ru_dictionary.txt"
+        corr = LanguageModelCorrector(bigrams_path, dict_path if dict_path.exists() else None)
         post_processor.register_language_corrector(corr)
         logger.info("LanguageModelCorrector: loaded")
     except Exception as e:
