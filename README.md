@@ -7,14 +7,14 @@
 ## Возможности
 
 ### Приложение умеет:
-- **5 OCR движков** в каскадном режиме (EasyOCR → Tesseract → TrOCR → PaddleOCR → Surya OCR)
+- **7 OCR движков** в каскадном режиме (EasyOCR → Tesseract → TrOCR → PaddleOCR → Surya OCR → docTR → GOT-OCR2)
 - **Все движки всегда запускаются**, результаты каждого сохраняются отдельно
 - **Оценка моделей** — каждая модель оценивается от 0 до 100 в файле результата
 - **Время каждой модели** — `start` / `end` / `duration` для каждого движка
 - **Автоопределение типа документа** — `photo` / `old_document` / `default`
 - **PDF поддержка** — через PyMuPDF, без внешних зависимостей
 - **CUDA автоопределение** — проверка GPU при старте, предупреждение если недоступен
-- **Форматы вывода** — TXT / DOC (Word) / MD (Markdown) по выбору
+- **Форматы вывода** — TXT + DOC (Word) + MD (Markdown) генерируются всегда
 - **Дореволюционный текст** — поддержка `rus_old` через Tesseract
 - **Улучшенная бинаризация** — Sauvola для старых документов
 - **Контекстная коррекция** — биграммы для исправления слов
@@ -34,22 +34,21 @@
 - Windows 10/11 (x64)
 - **Python 3.11 или 3.12** — версии 3.13+ не поддерживают CUDA
 - Tesseract OCR 5.3+ (для `rus_old` нужен пакет `rus_old.traineddata`)
-- GPU с CUDA (опционально, для EasyOCR, TrOCR, PaddleOCR, Surya OCR)
+- GPU с CUDA (опционально, для EasyOCR, TrOCR, PaddleOCR, Surya OCR, docTR, GOT-OCR2)
 
 ## Быстрый старт
 
 ```batch
 run.bat                — автоустановка + обработка input_files
 python main.py --install       — установка всех движков
-python main.py --input photos --format md
 python main.py --input photos --mode universal
 python main.py --input photos --workers 4
-python main.py --single photo.jpg --format doc
+python main.py --single photo.jpg
 ```
 
 ## Архитектура
 
-5 OCR движков работают в **каскадном режиме** — все запускаются всегда,
+7 OCR движков работают в **каскадном режиме** — все запускаются всегда,
 каждый выдаёт свой результат. Лучший выбирается по max confidence.
 
 | Движок | Тип | CUDA | Результат в файле |
@@ -59,6 +58,8 @@ python main.py --single photo.jpg --format doc
 | **TrOCR** | Рукописный кириллица | ✅ GPU-auto | `alternatives.trocr_text` |
 | **PaddleOCR** | Печатный ru/en | ✅ GPU (PaddlePaddle) | `alternatives.paddleocr_text` |
 | **Surya OCR** | Универсальный | ✅ GPU-auto | `alternatives.suryaocr_text` |
+| **docTR** | Документный OCR | ✅ GPU-auto | `alternatives.doctr_text` |
+| **GOT-OCR2** | Transformer OCR | ✅ GPU-auto | `alternatives.gotocr_text` |
 
 ### Оценка моделей в файле результата
 
@@ -133,7 +134,7 @@ Image → [EasyOCR] → если confidence < 70% → [Tesseract] → если �
 
 ### 9. Сохранение
 - **JSON** — полная структура со всеми полями
-- **TXT** / **DOC** (Word) / **MD** (Markdown) — по выбору (`--format`)
+- **TXT** + **DOC** (Word) + **MD** (Markdown) — все три формата генерируются одновременно
 
 ### 4. Выбор приоритетного движка
 - Для `handwritten` → TrOCR (если доступен)
@@ -321,10 +322,9 @@ python main.py --single photo.jpg
 | `--reset` | Сбросить состояние batch |
 | `--single F` | Обработать один файл |
 | `--retry N` | Число повторов при ошибке |
-| `--format` | Формат вывода: `txt` (по умолч.), `doc` (Word), `md` (Markdown) |
 | `--mode` | Режим: `library` (библиотечные поля) или `universal` (только текст) |
 | `--workers N` | Число параллельных потоков для batch (по умолч. 1) |
-| `--install` | Установить все зависимости и дополнительные OCR движки |
+| `--install` | Установить все зависимости и все OCR движки (7 штук) |
 
 ## Структура проекта
 

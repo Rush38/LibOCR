@@ -24,7 +24,7 @@
 - CUDA Toolkit 12.x
 - **Важно**: Python 3.11 или 3.12 — PyTorch с CUDA не поддерживает Python 3.13+
 
-## OCR Engines (5 движков + опциональные)
+## OCR Engines (7 движков)
 
 ### EasyOCR
 - Печатный текст, русский/английский
@@ -47,9 +47,30 @@
 - Загружается через `VisionEncoderDecoderModel` + `TrOCRProcessor`
 - **Local model support**: модель скачивается в `models/` через `snapshot_download`, используется локально без повторной загрузки
 
+### PaddleOCR (обязательный)
+- Печатный русский/английский
+- Собственный DL-фреймворк (PaddlePaddle), GPU
+- Устанавливается через `--install`
+
+### Surya OCR (обязательный)
+- Универсальный OCR на базе torch
+- GPU-auto (cuda если доступна)
+- Устанавливается через `--install`
+
+### docTR (обязательный)
+- Документный OCR от Mindee
+- Распознавание слов и строк, русский язык
+- GPU-auto (cuda если доступна)
+- Устанавливается через `--install`
+
+### GOT-OCR2 (обязательный)
+- Современная transformer-модель
+- Высокое качество на сложных документах
+- GPU-auto (cuda если доступна)
+- Устанавливается через `--install`
+
 ### Альтернативные движки (не встроены)
-- **PaddleOCR** — `pip install paddleocr` (свой фреймворк PaddlePaddle, GPU)
-- **Surya OCR** — `pip install surya-ocr` (на базе torch)
+- (нет — все движки обязательны)
 
 ## Dictionary System
 

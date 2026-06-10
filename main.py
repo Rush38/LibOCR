@@ -90,7 +90,7 @@ def parse_arguments():
     parser.add_argument(
         "--install",
         action="store_true",
-        help="Установить все зависимости и дополнительные OCR движки",
+        help="Установить все зависимости и все OCR движки (7 штук)",
     )
     parser.add_argument(
         "--lang",
