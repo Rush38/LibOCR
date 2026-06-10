@@ -133,6 +133,8 @@ class PostProcessor:
             },
             "warnings": ocr_result.get("warnings", []),
             "language": language,
+            "best_engine": ocr_result.get("best_engine", {}),
+            "engine_times": ocr_result.get("engine_times", {}),
             "consensus_validated": len(possible_errors) == 0,
         }
 

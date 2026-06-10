@@ -132,12 +132,15 @@ def process_single_image(
 
             easy_conf_total = 0.0
             tess_conf_total = 0.0
+            trocr_conf_total = 0.0
 
             for part in ocr_parts:
                 easy_conf_total += part["easyocr_conf"]
                 tess_conf_total += part["tesseract_conf"]
+                trocr_conf_total += part.get("trocr_conf", 0.0)
 
             n = len(ocr_parts)
+            last_part = ocr_parts[-1] if ocr_parts else {}
             combined_result = {
                 "easyocr_text": "\n".join(
                     [p["easyocr_text"] for p in ocr_parts]
@@ -145,12 +148,18 @@ def process_single_image(
                 "tesseract_text": "\n".join(
                     [p["tesseract_text"] for p in ocr_parts]
                 ),
+                "trocr_text": "\n".join(
+                    [p.get("trocr_text", "") for p in ocr_parts]
+                ),
                 "easyocr_conf": easy_conf_total / n if n else 0,
                 "tesseract_conf": tess_conf_total / n if n else 0,
+                "trocr_conf": trocr_conf_total / n if n else 0,
                 "overall_conf": sum(p["overall_conf"] for p in ocr_parts)
                 / n
                 if n
                 else 0,
+                "best_engine": last_part.get("best_engine", {}),
+                "engine_times": last_part.get("engine_times", {}),
                 "warnings": [],
             }
 
@@ -184,15 +193,19 @@ def process_single_image(
 
             text_type = result_data.get("text_type", "unknown")
             primary_engine = result_data.get("primary_engine", "tesseract")
+            best_engine = result_data.get("best_engine", {})
+            engine_times = result_data.get("engine_times", {})
             library_terms_count = len(result_data.get("library_terms", []))
             raw_preview = result_data.get("raw_text", "")[:80].replace("\n", " ")
 
             status = "OK" if overall >= 0.6 else "WARN"
             color = Colors.GREEN if overall >= 0.6 else Colors.YELLOW
+            best_name = best_engine.get("name", primary_engine)
+            et = engine_times.get(best_name, 0)
 
             print_colored(
                 f"[{status}] {filename} | {text_type} | {primary_engine} | {library_terms_count} терминов | "
-                f"T:{tess:.0%} Tr:{trocr:.0%} | {elapsed:.1f}s",
+                f"T:{tess:.0%} Tr:{trocr:.0%} | Лучший: {best_name} ({et:.1f}s) | {elapsed:.1f}s",
                 color,
             )
             if raw_preview.strip():

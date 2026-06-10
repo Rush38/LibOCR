@@ -209,76 +209,95 @@ class HybridOCREngine:
 
     def recognize(self, image: np.ndarray) -> Dict[str, Any]:
         timeout = self.config["processing"]["timeout_engine"]
+        warnings: List[str] = []
+        engine_times: Dict[str, float] = {}
+        results: Dict[str, Dict] = {}
 
         _ = self.easyocr_reader
         _ = self.trocr_model
-
-        easy_result: Optional[Dict] = None
-        tess_result: Optional[Dict] = None
-        trocr_result: Optional[Dict] = None
-        glm_result: Optional[Dict] = None
-        warnings: List[str] = []
+        cascade = self.config.get("processing", {}).get("cascade", False)
 
         try:
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                f_easy = executor.submit(self._run_easyocr, image)
-                f_tess = executor.submit(self._run_tesseract, image)
-                f_troc = executor.submit(self._run_trocr, image)
-                f_glm = executor.submit(self._run_glmocr, image)
+            import time as tmod
 
-                try:
-                    easy_result = f_easy.result(timeout=timeout)
-                except FuturesTimeoutError:
-                    warnings.append("EasyOCR: timeout")
-                except Exception as e:
-                    warnings.append(f"EasyOCR: {str(e)}")
+            if cascade:
+                t0 = tmod.time()
+                easy_result = self._run_easyocr(image)
+                engine_times["easyocr"] = tmod.time() - t0
+                results["easyocr"] = easy_result
+                if easy_result.get("error"):
+                    warnings.append(f"EasyOCR: {easy_result['error']}")
 
-                try:
-                    tess_result = f_tess.result(timeout=timeout)
-                except FuturesTimeoutError:
-                    warnings.append("Tesseract: timeout")
-                except Exception as e:
-                    warnings.append(f"Tesseract: {str(e)}")
+                if not easy_result.get("text", "").strip() or easy_result.get("confidence", 0) < 0.3:
+                    easy_result2 = self._run_easyocr(image, paragraph=False)
+                    if easy_result2.get("text", "").strip():
+                        results["easyocr"] = easy_result2
+                        engine_times["easyocr"] += engine_times.get("easyocr", 0)
 
-                try:
-                    trocr_result = f_troc.result(timeout=timeout * 2)
-                except FuturesTimeoutError:
-                    warnings.append("TrOCR: timeout")
-                except Exception as e:
-                    warnings.append(f"TrOCR: {str(e)}")
+                easy_conf = results["easyocr"].get("confidence", 0.0)
+                if easy_conf < 0.7:
+                    t1 = tmod.time()
+                    tess_result = self._run_tesseract(image)
+                    engine_times["tesseract"] = tmod.time() - t1
+                    results["tesseract"] = tess_result
+                    if tess_result.get("error"):
+                        warnings.append(f"Tesseract: {tess_result['error']}")
 
-                try:
-                    glm_result = f_glm.result(timeout=timeout * 2)
-                except FuturesTimeoutError:
-                    warnings.append("GLM-OCR: timeout")
-                except Exception as e:
-                    warnings.append(f"GLM-OCR: {str(e)}")
+                tess_conf = results.get("tesseract", {}).get("confidence", 0.0) if "tesseract" in results else 0.0
+                if max(easy_conf, tess_conf) < 0.6:
+                    t2 = tmod.time()
+                    trocr_result = self._run_trocr(image)
+                    engine_times["trocr"] = tmod.time() - t2
+                    results["trocr"] = trocr_result
+                    if trocr_result.get("error"):
+                        warnings.append(f"TrOCR: {trocr_result['error']}")
+            else:
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    f_easy = executor.submit(self._run_easyocr, image)
+                    f_tess = executor.submit(self._run_tesseract, image)
+                    f_troc = executor.submit(self._run_trocr, image)
+                    f_glm = executor.submit(self._run_glmocr, image)
+
+                    for name, future, t_out in [
+                        ("easyocr", f_easy, timeout),
+                        ("tesseract", f_tess, timeout),
+                        ("trocr", f_troc, timeout * 2),
+                        ("glmocr", f_glm, timeout * 2),
+                    ]:
+                        t0 = tmod.time()
+                        try:
+                            res = future.result(timeout=t_out)
+                            engine_times[name] = tmod.time() - t0
+                            results[name] = res
+                            if res.get("error"):
+                                warnings.append(f"{name.capitalize()}: {res['error']}")
+                        except FuturesTimeoutError:
+                            warnings.append(f"{name.capitalize()}: timeout")
+                            engine_times[name] = t_out
+                        except Exception as e:
+                            warnings.append(f"{name.capitalize()}: {str(e)}")
+                            engine_times[name] = tmod.time() - t0
 
         except Exception as e:
-            warnings.append(f"ThreadPool: {str(e)}")
+            warnings.append(f"OCR: {str(e)}")
 
-        easy_text = easy_result.get("text", "") if easy_result else ""
-        easy_conf = easy_result.get("confidence", 0.0) if easy_result else 0.0
-        if easy_result and easy_result.get("error"):
-            warnings.append(f"EasyOCR: {easy_result['error']}")
+        easy_text = results.get("easyocr", {}).get("text", "")
+        easy_conf = results.get("easyocr", {}).get("confidence", 0.0)
+        tess_text = results.get("tesseract", {}).get("text", "")
+        tess_conf = results.get("tesseract", {}).get("confidence", 0.0)
+        trocr_text = results.get("trocr", {}).get("text", "")
+        trocr_conf = results.get("trocr", {}).get("confidence", 0.0)
+        glm_text = results.get("glmocr", {}).get("text", "")
+        glm_conf = results.get("glmocr", {}).get("confidence", 0.0)
 
-        tess_text = tess_result.get("text", "") if tess_result else ""
-        tess_conf = tess_result.get("confidence", 0.0) if tess_result else 0.0
-        if tess_result and tess_result.get("error"):
-            warnings.append(f"Tesseract: {tess_result['error']}")
+        conf_map = {"easyocr": easy_conf, "tesseract": tess_conf, "trocr": trocr_conf}
+        active = {k: v for k, v in conf_map.items() if v > 0}
+        overall = sum(active.values()) / len(active) if active else 0.0
 
-        trocr_text = trocr_result.get("text", "") if trocr_result else ""
-        trocr_conf = trocr_result.get("confidence", 0.0) if trocr_result else 0.0
-        if trocr_result and trocr_result.get("error"):
-            warnings.append(f"TrOCR: {trocr_result['error']}")
-
-        glm_text = glm_result.get("text", "") if glm_result else ""
-        glm_conf = glm_result.get("confidence", 0.0) if glm_result else 0.0
-        if glm_result and glm_result.get("error"):
-            warnings.append(f"GLM-OCR: {glm_result['error']}")
-
-        active_confs = [c for c in [easy_conf, tess_conf, trocr_conf, glm_conf] if c > 0]
-        overall = sum(active_confs) / len(active_confs) if active_confs else 0.0
+        best_name = max(active, key=active.get) if active else "tesseract"
+        best_reason = f"наивысшая уверенность ({active.get(best_name, 0):.0%})"
+        if cascade:
+            best_reason += " (каскадный режим)"
 
         return {
             "easyocr_text": easy_text,
@@ -290,14 +309,21 @@ class HybridOCREngine:
             "trocr_conf": trocr_conf,
             "glmocr_conf": glm_conf,
             "overall_conf": overall,
+            "best_engine": {
+                "name": best_name,
+                "confidence": active.get(best_name, 0.0),
+                "reason": best_reason,
+            },
+            "engine_times": engine_times,
             "warnings": warnings,
         }
 
-    def _run_easyocr(self, image: np.ndarray) -> Dict[str, Any]:
+    def _run_easyocr(self, image: np.ndarray, paragraph: Optional[bool] = None) -> Dict[str, Any]:
         try:
+            use_paragraph = paragraph if paragraph is not None else self.easy_config.get("paragraph", True)
             results = self.easyocr_reader.readtext(
                 image,
-                paragraph=self.easy_config.get("paragraph", True),
+                paragraph=use_paragraph,
             )
 
             text_parts = []

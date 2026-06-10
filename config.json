@@ -80,7 +80,8 @@
     "timeout_engine": 60,
     "timeout_image": 180,
     "retry": 3,
-    "retry_delay": 2
+    "retry_delay": 2,
+    "cascade": true
   },
   "output": {
     "encoding": "utf-8-sig",
