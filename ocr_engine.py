@@ -115,7 +115,6 @@ class HybridOCREngine:
 
         try:
             from transformers import (
-                TrOCRProcessor,
                 VisionEncoderDecoderModel,
             )
             import torch

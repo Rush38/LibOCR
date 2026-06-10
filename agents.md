@@ -44,7 +44,8 @@
 - 0.6B параметров, Apache 2.0
 - Lazy-loaded, GPU-auto (cuda если доступна)
 - Timeout x2 относительно других движков
-- Загружается через `VisionEncoderDecoderModel` + `TrOCRProcessor`
+- Загружается через `VisionEncoderDecoderModel` + `ViTImageProcessor` + `AutoTokenizer`
+- **Важно:** требуется `transformers<4.50.0` из-за несовместимости TokenizersBackend
 - **Local model support**: модель скачивается в `models/` через `snapshot_download`, используется локально без повторной загрузки
 
 ### PaddleOCR (обязательный)
