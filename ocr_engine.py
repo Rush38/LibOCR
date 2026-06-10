@@ -653,7 +653,7 @@ class HybridOCREngine:
                     use_gpu=self._easyocr_gpu,
                 )
             except ImportError:
-                logging.getLogger("LibraryOCR").warning("PaddleOCR: not available")
+                logging.getLogger("LibraryOCR").debug("PaddleOCR: not available (pip install paddleocr)")
                 self._paddleocr_reader = False
             except Exception as e:
                 logging.getLogger("LibraryOCR").warning(f"PaddleOCR: {e}")
@@ -677,7 +677,7 @@ class HybridOCREngine:
                     "det_processor": load_det_processor(),
                 }
             except ImportError:
-                logging.getLogger("LibraryOCR").warning("Surya OCR: not available")
+                logging.getLogger("LibraryOCR").debug("Surya OCR: not available (pip install surya-ocr)")
                 self._surya_ocr_reader = False
             except Exception as e:
                 logging.getLogger("LibraryOCR").warning(f"Surya OCR: {e}")
@@ -747,7 +747,7 @@ class HybridOCREngine:
                     predictor = predictor.cuda()
                 self._doctr_reader = {"predictor": predictor, "doc_file": DocumentFile}
             except ImportError:
-                logging.getLogger("LibraryOCR").warning("docTR: not available")
+                logging.getLogger("LibraryOCR").debug("docTR: not available (pip install python-doctr)")
                 self._doctr_reader = False
             except Exception as e:
                 logging.getLogger("LibraryOCR").warning(f"docTR: {e}")
@@ -783,7 +783,7 @@ class HybridOCREngine:
                 from got_ocr import GOT_OCR
                 self._gotocr_reader = GOT_OCR()
             except ImportError:
-                logging.getLogger("LibraryOCR").warning("GOT-OCR: not available")
+                logging.getLogger("LibraryOCR").debug("GOT-OCR: not available (pip install got-ocr)")
                 self._gotocr_reader = False
             except Exception as e:
                 logging.getLogger("LibraryOCR").warning(f"GOT-OCR: {e}")
