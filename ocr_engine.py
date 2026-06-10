@@ -394,6 +394,7 @@ class HybridOCREngine:
                 generated_ids = self._trocr_model.generate(
                     **inputs,
                     max_new_tokens=256,
+                    max_length=256,
                     num_beams=4,
                     early_stopping=True,
                 )
