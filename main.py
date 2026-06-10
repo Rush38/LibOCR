@@ -228,7 +228,7 @@ def process_single_image(
             best_name = best_engine.get("name", primary_engine)
 
             et_parts = []
-            for eng in ["easyocr", "tesseract", "trocr"]:
+            for eng in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "doctr", "gotocr"]:
                 et = engine_times.get(eng, {})
                 if isinstance(et, dict):
                     dur = et.get("duration", 0)
@@ -303,6 +303,8 @@ def main():
         extras = [
             ("paddleocr", "paddleocr", "PaddleOCR — высокая точность, свой DL-фреймворк"),
             ("surya_ocr", "surya-ocr", "Surya OCR — современная архитектура на torch"),
+            ("doctr", "python-doctr", "docTR — документный OCR от Mindee"),
+            ("got_ocr", "got-ocr", "GOT-OCR2 — transformer OCR"),
         ]
         for mod_name, pip_name, desc in extras:
             try:

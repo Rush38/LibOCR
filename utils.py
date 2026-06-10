@@ -205,7 +205,8 @@ def save_txt_output(path, data):
 
     lines.append("ОЦЕНКА МОДЕЛЕЙ (0-100):")
     model_names = {"easyocr": "EasyOCR", "tesseract": "Tesseract", "trocr": "TrOCR",
-                   "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR"}
+                   "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR",
+                   "doctr": "docTR", "gotocr": "GOT-OCR"}
     sorted_models = sorted(
         [(k, v) for k, v in conf.items() if k != "overall" and v > 0],
         key=lambda x: -x[1]
@@ -220,7 +221,7 @@ def save_txt_output(path, data):
 
     lines.append("РЕЗУЛЬТАТЫ ВСЕХ МОДЕЛЕЙ:")
     lines.append("")
-    for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr"]:
+    for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr", "doctr", "gotocr"]:
         alt_text = alternatives.get(f"{model_key}_text", "")
         if not alt_text or not alt_text.strip():
             continue
@@ -309,7 +310,8 @@ def save_doc_output(path, data):
 
         doc.add_heading("Оценка моделей (0-100)", 1)
         model_names = {"easyocr": "EasyOCR", "tesseract": "Tesseract", "trocr": "TrOCR",
-                       "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR"}
+                       "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR",
+                   "doctr": "docTR", "gotocr": "GOT-OCR"}
         sorted_models = sorted(
             [(k, v) for k, v in conf.items() if k != "overall" and v > 0],
             key=lambda x: -x[1]
@@ -322,7 +324,7 @@ def save_doc_output(path, data):
             p = doc.add_paragraph(f"{name}: {score*100:.0f}/100 (время: {dur:.1f}с){marker}")
 
         doc.add_heading("Результаты всех моделей", 1)
-        for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr"]:
+        for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr", "doctr", "gotocr"]:
             alt_text = alternatives.get(f"{model_key}_text", "")
             if not alt_text or not alt_text.strip():
                 continue
@@ -385,7 +387,8 @@ def save_md_output(path, data):
     alternatives = data.get("alternatives", {})
     best = data.get("best_engine", {})
     model_names = {"easyocr": "EasyOCR", "tesseract": "Tesseract", "trocr": "TrOCR",
-                   "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR"}
+                   "paddleocr": "PaddleOCR", "suryaocr": "Surya OCR", "glmocr": "GLM-OCR",
+                   "doctr": "docTR", "gotocr": "GOT-OCR"}
 
     sep = "---"
     parts = [
@@ -411,7 +414,7 @@ def save_md_output(path, data):
         marker = " ★" if best.get("name") == model_key else ""
         parts.append(f"{i}. **{name}**: {score*100:.0f}/100 (время: {dur:.1f}с){marker}")
 
-    for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr"]:
+    for model_key in ["easyocr", "tesseract", "trocr", "paddleocr", "suryaocr", "glmocr", "doctr", "gotocr"]:
         alt_text = alternatives.get(f"{model_key}_text", "")
         if not alt_text or not alt_text.strip():
             continue

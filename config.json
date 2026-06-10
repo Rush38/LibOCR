@@ -33,12 +33,22 @@
       "line_segmentation": true
     },
     "glmocr": {
-      "enabled": true,
+      "enabled": false,
       "model_name": "zai-org/GLM-OCR",
       "device": "auto",
       "local_models_dir": "models",
-      "note": "experimental: tries image-text-to-text, direct Vision2Seq loading"
+      "note": "experimental"
     },
+    "doctr": {
+      "enabled": true,
+      "languages": ["ru", "en"],
+      "gpu": true
+    },
+    "gotocr": {
+      "enabled": true,
+      "gpu": true
+    }
+  },
   "pdf": {
     "enabled": true,
     "dpi": 300,

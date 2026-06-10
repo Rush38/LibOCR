@@ -16,6 +16,8 @@ class HybridOCREngine:
         self.tesser_config = config["ocr"]["tesseract"]
         self.trocr_config = config["ocr"].get("trocr", {})
         self.glm_config = config["ocr"].get("glmocr", {})
+        self.doctr_config = config["ocr"].get("doctr", {})
+        self.gotocr_config = config["ocr"].get("gotocr", {})
 
         pytesseract.pytesseract.tesseract_cmd = self.tesser_config["path"]
 
@@ -39,6 +41,8 @@ class HybridOCREngine:
 
         self._paddleocr_reader = None
         self._surya_ocr_reader = None
+        self._doctr_reader = None
+        self._gotocr_reader = None
 
     @property
     def easyocr_reader(self):
@@ -301,6 +305,24 @@ class HybridOCREngine:
                 results["suryaocr"] = surya_result
                 if surya_result.get("error"):
                     warnings.append(f"SuryaOCR: {surya_result['error']}")
+
+                t10 = tmod.time()
+                t10_str = dt.datetime.now().strftime("%H:%M:%S")
+                doctr_result = self._run_doctr(image)
+                t11_str = dt.datetime.now().strftime("%H:%M:%S")
+                engine_times["doctr"] = {"start": t10_str, "end": t11_str, "duration": round(tmod.time() - t10, 2)}
+                results["doctr"] = doctr_result
+                if doctr_result.get("error"):
+                    warnings.append(f"docTR: {doctr_result['error']}")
+
+                t12 = tmod.time()
+                t12_str = dt.datetime.now().strftime("%H:%M:%S")
+                gotocr_result = self._run_gotocr(image)
+                t13_str = dt.datetime.now().strftime("%H:%M:%S")
+                engine_times["gotocr"] = {"start": t12_str, "end": t13_str, "duration": round(tmod.time() - t12, 2)}
+                results["gotocr"] = gotocr_result
+                if gotocr_result.get("error"):
+                    warnings.append(f"GOT-OCR: {gotocr_result['error']}")
             else:
                 with ThreadPoolExecutor(max_workers=4) as executor:
                     f_easy = executor.submit(self._run_easyocr, image)
@@ -347,9 +369,14 @@ class HybridOCREngine:
         paddle_conf = results.get("paddleocr", {}).get("confidence", 0.0)
         surya_text = results.get("suryaocr", {}).get("text", "")
         surya_conf = results.get("suryaocr", {}).get("confidence", 0.0)
+        doctr_text = results.get("doctr", {}).get("text", "")
+        doctr_conf = results.get("doctr", {}).get("confidence", 0.0)
+        gotocr_text = results.get("gotocr", {}).get("text", "")
+        gotocr_conf = results.get("gotocr", {}).get("confidence", 0.0)
 
         conf_map = {"easyocr": easy_conf, "tesseract": tess_conf, "trocr": trocr_conf,
-                    "paddleocr": paddle_conf, "suryaocr": surya_conf}
+                    "paddleocr": paddle_conf, "suryaocr": surya_conf,
+                    "doctr": doctr_conf, "gotocr": gotocr_conf}
         active = {k: v for k, v in conf_map.items() if v > 0}
         overall = sum(active.values()) / len(active) if active else 0.0
 
@@ -365,12 +392,16 @@ class HybridOCREngine:
             "glmocr_text": glm_text,
             "paddleocr_text": paddle_text,
             "suryaocr_text": surya_text,
+            "doctr_text": doctr_text,
+            "gotocr_text": gotocr_text,
             "easyocr_conf": easy_conf,
             "tesseract_conf": tess_conf,
             "trocr_conf": trocr_conf,
             "glmocr_conf": glm_conf,
             "paddleocr_conf": paddle_conf,
             "suryaocr_conf": surya_conf,
+            "doctr_conf": doctr_conf,
+            "gotocr_conf": gotocr_conf,
             "overall_conf": overall,
             "best_engine": {
                 "name": best_name,
@@ -684,13 +715,65 @@ class HybridOCREngine:
         except Exception as e:
             return {"text": "", "confidence": 0.0, "error": str(e)}
 
-    def download_models(self):
-        for model_name, local_dir in [
-            (self._trocr_model_name, self._trocr_local_dir),
-            (self._glm_model_name, self._glm_local_dir),
-        ]:
-            path = self._download_model_locally(model_name, local_dir)
-            if path:
-                print(f"Model downloaded: {model_name} -> {path}")
-            else:
-                print(f"Model already exists or download failed: {model_name}")
+    @property
+    def doctr_reader(self):
+        if self._doctr_reader is None:
+            try:
+                from doctr.io import DocumentFile
+                from doctr.models import ocr_predictor
+                import torch
+                use_gpu = self.doctr_config.get("gpu", True) and torch.cuda.is_available()
+                predictor = ocr_predictor(pretrained=True)
+                if use_gpu:
+                    predictor = predictor.cuda()
+                self._doctr_reader = {"predictor": predictor, "doc_file": DocumentFile}
+            except Exception as e:
+                logging.getLogger("LibraryOCR").warning(f"docTR: not available ({e})")
+                return None
+        return self._doctr_reader
+
+    def _run_doctr(self, image: np.ndarray) -> Dict[str, Any]:
+        reader = self.doctr_reader
+        if reader is None:
+            return {"text": "", "confidence": 0.0, "error": "docTR не загружен"}
+        try:
+            from PIL import Image as PILImage
+            pil_img = PILImage.fromarray(image)
+            doc = reader["doc_file"].from_images([pil_img])
+            result = reader["predictor"](doc)
+            words, confs = [], []
+            for page in result.pages:
+                for block in page.blocks:
+                    for line in block.lines:
+                        for word in line.words:
+                            words.append(word.value)
+                            confs.append(word.confidence)
+            combined = " ".join(words)
+            avg_conf = float(np.mean(confs)) if confs else 0.0
+            return {"text": combined, "confidence": avg_conf}
+        except Exception as e:
+            return {"text": "", "confidence": 0.0, "error": str(e)}
+
+    @property
+    def gotocr_reader(self):
+        if self._gotocr_reader is None:
+            try:
+                from got_ocr import GOT_OCR
+                self._gotocr_reader = GOT_OCR()
+            except Exception as e:
+                logging.getLogger("LibraryOCR").warning(f"GOT-OCR: not available ({e})")
+                return None
+        return self._gotocr_reader
+
+    def _run_gotocr(self, image: np.ndarray) -> Dict[str, Any]:
+        reader = self.gotocr_reader
+        if reader is None:
+            return {"text": "", "confidence": 0.0, "error": "GOT-OCR не загружен"}
+        try:
+            from PIL import Image as PILImage
+            pil_img = PILImage.fromarray(image)
+            result = reader(pil_img)
+            text = result.get("text", "") if isinstance(result, dict) else str(result)
+            return {"text": text, "confidence": 0.90}
+        except Exception as e:
+            return {"text": "", "confidence": 0.0, "error": str(e)}
