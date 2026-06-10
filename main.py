@@ -128,6 +128,7 @@ def process_single_image(
             is_pdf = img_path.suffix.lower() == ".pdf"
             if is_pdf:
                 pdf_proc = PDFProcessor(config)
+                print_colored(f"  [PDF] Извлечение {img_path.name}...", Colors.BLUE)
                 page_images = pdf_proc.extract_images_from_pdf(img_path)
                 if not page_images:
                     raise ValueError(f"Не удалось извлечь страницы из PDF: {img_path.name}")
@@ -139,9 +140,10 @@ def process_single_image(
                     "columns_count": 1,
                     "original_size": (page_images[0].shape[1], page_images[0].shape[0]),
                 }
-                logger.info(f"PDF {img_path.name}: {len(blocks)} pages")
+                print_colored(f"  [PDF] {len(blocks)} страниц извлечено, запуск OCR...", Colors.BLUE)
             else:
                 blocks, metadata = image_processor.process(img_path)
+                print_colored(f"  [OCR] Запуск 7 движков для {filename}...", Colors.BLUE)
 
             if debug_mode and debug_dir:
                 import cv2
@@ -245,7 +247,7 @@ def process_single_image(
                 color,
             )
             if raw_preview.strip():
-                print_colored(f"     Text: {raw_preview}...", Colors.BLUE)
+                print_colored(f"     Текст: {raw_preview}...", Colors.BLUE)
 
             return {
                 "file": filename,
@@ -478,6 +480,13 @@ def main():
     print_colored(
         f"[INFO] Найдено изображений: {len(images)}", Colors.BLUE
     )
+    print_colored(f"[INFO] Движки: EasyOCR Tesseract TrOCR PaddleOCR Surya docTR GOT-OCR2", Colors.BLUE)
+    try:
+        import torch
+        if torch.cuda.is_available():
+            print_colored(f"[INFO] GPU: {torch.cuda.get_device_name(0)}", Colors.GREEN)
+    except Exception:
+        pass
 
     max_retries = (
         args.retry
