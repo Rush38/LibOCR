@@ -5,6 +5,7 @@ set ROOT=%~dp0
 set IN=
 set DBG=
 set RES=
+set PYTHON_ARGS=
 
 if "%~1"=="" goto run
 if "%~1"=="--check" goto check
