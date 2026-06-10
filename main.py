@@ -353,6 +353,15 @@ def main():
     ocr_engine = HybridOCREngine(config)
     post_processor = PostProcessor()
 
+    try:
+        from language_corrector import LanguageModelCorrector
+        bigrams_path = get_project_root() / "models" / "ru_bigrams.json"
+        corr = LanguageModelCorrector(bigrams_path)
+        post_processor.register_language_corrector(corr)
+        logger.info("LanguageModelCorrector: loaded")
+    except Exception as e:
+        logger.warning(f"LanguageModelCorrector: not loaded ({e})")
+
     results = []
 
     total_start = time.time()
