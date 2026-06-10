@@ -48,7 +48,7 @@ Write-ColorOutput "  Установка LibOCR" "White"
 Write-ColorOutput "============================================" "White"
 Write-ColorOutput ""
 
-$dirs = @("input_images", "output_texts", "logs", "debug", "temp_install")
+$dirs = @("input_files", "output_texts", "logs", "debug", "temp_install")
 foreach ($dir in $dirs) {
     $path = Join-Path $ScriptDir $dir
     if (-not (Test-Path $path)) {
@@ -185,7 +185,7 @@ else {
     }
 }
 
-$testImages = Get-ChildItem -Path (Join-Path $ScriptDir "input_images") -Filter *.jpg,*.png -ErrorAction SilentlyContinue | Select-Object -First 1
+$testImages = Get-ChildItem -Path (Join-Path $ScriptDir "input_files") -Filter *.jpg,*.png -ErrorAction SilentlyContinue | Select-Object -First 1
 
 if ($testImages -and (Test-Path $tesseractExe)) {
     Write-ColorOutput "[....] Тестирование OCR..." "Cyan"

@@ -70,8 +70,8 @@
 - `--retry N`   — число повторов при ошибке
 
 ## Nested Images
-- Обрабатываются изображения во всех подпапках `input_images/` (рекурсивно)
-- Структура папок сохраняется: `input_images/subfolder/image.jpg` → `output_texts/subfolder/image.json`
+- Обрабатываются изображения во всех подпапках `input_files/` (рекурсивно)
+- Структура папок сохраняется: `input_files/subfolder/image.jpg` → `output_texts/subfolder/image.json`
 - Иерархия директорий воспроизводится в `output_texts/`
 - **Skip already processed**: если JSON-файл результата уже существует — изображение пропускается (даже без `--resume`)
 
@@ -160,7 +160,7 @@ Also produces:
 - [ ] Dictionary is loaded via `DictionaryLoader` singleton
 - [ ] TrOCR uses `VisionEncoderDecoderModel` + `TrOCRProcessor` from `Kansallisarkisto/cyrillic-large-handwritten`
 - [ ] Error tracking saves to `error_reports/`
-- [ ] Nested image paths preserved: `input_images/sub/name.jpg` → `output_texts/sub/name.json`
+- [ ] Nested image paths preserved: `input_files/sub/name.jpg` → `output_texts/sub/name.json`
 - [ ] Python files pass `python -m py_compile`
 - [ ] Working tree is clean (`git status --short`)
 - [ ] No secrets/keys in code

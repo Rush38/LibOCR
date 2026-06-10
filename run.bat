@@ -10,7 +10,7 @@ if "%~1"=="" goto run
 if "%~1"=="--check" goto check
 if "%~1"=="--help" goto help
 if "%~1"=="-h" goto help
-if "%~1"=="--auto" set IN=%ROOT%input_images
+if "%~1"=="--auto" set IN=%ROOT%input_files
 if "%~1"=="--debug" set DBG=--debug
 if "%~1"=="--resume" set RES=--resume
 if "%~1"=="--reset" set RES=--reset
@@ -33,7 +33,7 @@ if errorlevel 1 (
     echo [INFO] Using Python 3.12 (GPU support)
 )
 
-if not defined IN set IN=%ROOT%input_images
+if not defined IN set IN=%ROOT%input_files
 
 if not exist "%ROOT%main.py" (
     echo [FAIL] main.py not found.
@@ -81,7 +81,7 @@ if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
 )
 echo.
 echo Usage:
-echo   run.bat              - process input_images
+echo   run.bat              - process input_files
 echo   run.bat --debug      - debug mode
 echo   run.bat --check      - system check
 echo   run.bat --help       - help
@@ -92,7 +92,7 @@ exit /b 0
 echo LibOCR - OCR for library cards
 echo.
 echo Usage:
-echo   run.bat              - process input_images
+echo   run.bat              - process input_files
 echo   run.bat --debug      - debug mode
 echo   run.bat --check      - system check
 echo   run.bat --help       - help

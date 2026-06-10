@@ -1,6 +1,6 @@
 {
   "paths": {
-    "input_dir": "input_images",
+    "input_dir": "input_files",
     "output_dir": "output_texts",
     "log_dir": "logs",
     "debug_dir": "debug",

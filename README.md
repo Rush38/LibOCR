@@ -117,7 +117,7 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
 ```json
 {
   "paths": {
-    "input_dir": "input_images",
+    "input_dir": "input_files",
     "output_dir": "output_texts",
     "log_dir": "logs",
     "debug_dir": "debug"
@@ -173,7 +173,7 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
 
 ```batch
 run.bat                — интерактивный режим
-run.bat --auto         — обработать всё в input_images
+run.bat --auto         — обработать всё в input_files
 run.bat --debug        — сохранять промежуточные изображения
 run.bat --input path   — указать папку
 run.bat --check        — проверка системы
