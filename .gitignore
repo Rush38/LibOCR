@@ -44,8 +44,10 @@ logs/
 debug/
 error_reports/
 
-# User input files (not tracked)
-input_files/
+# User input files (ignore files in root, track .gitkeep and subdirectories)
+input_files/*
+!input_files/.gitkeep
+!input_files/**/
 
 # Python packages (portable)
 Lib/

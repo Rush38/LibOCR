@@ -42,9 +42,13 @@ if not exist "%ROOT%main.py" (
 )
 
 if not exist "%IN%" (
-    echo [FAIL] Folder not found: %IN%
-    pause
-    exit /b 1
+    mkdir "%IN%" 2>nul
+    if not exist "%IN%" (
+        echo [FAIL] Cannot create folder: %IN%
+        pause
+        exit /b 1
+    )
+    echo [INFO] Created folder: %IN%
 )
 
 echo.
