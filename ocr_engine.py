@@ -157,7 +157,7 @@ class HybridOCREngine:
             return None
 
         try:
-            from transformers import pipeline
+            from transformers import pipeline, AutoModelForVision2Seq, AutoProcessor
             import torch
 
             device = self._get_glm_device()
@@ -170,22 +170,43 @@ class HybridOCREngine:
             else:
                 load_from = model_name
 
-            self._glm_pipeline = pipeline(
-                "ocr",
-                model=load_from,
-                device=device,
-                torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            )
-            return self._glm_pipeline
+            tasks_to_try = ["image-text-to-text", "document-question-answering", None]
+            for task in tasks_to_try:
+                try:
+                    if task:
+                        self._glm_pipeline = pipeline(
+                            task,
+                            model=load_from,
+                            device=device,
+                            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+                        )
+                        logger = logging.getLogger("LibraryOCR")
+                        logger.info(f"GLM-OCR: loaded with task '{task}'")
+                        return self._glm_pipeline
+                    else:
+                        model = AutoModelForVision2Seq.from_pretrained(
+                            load_from,
+                            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+                        )
+                        model.to(device)
+                        model.eval()
+                        processor = AutoProcessor.from_pretrained(load_from)
+                        self._glm_pipeline = {"model": model, "processor": processor, "device": device}
+                        logger = logging.getLogger("LibraryOCR")
+                        logger.info("GLM-OCR: loaded directly (Vision2Seq)")
+                        return self._glm_pipeline
+                except Exception as e:
+                    continue
+
+            logging.getLogger("LibraryOCR").warning(f"GLM-OCR: all loading methods failed")
+            return None
 
         except ImportError as e:
-            import logging
             logging.getLogger("LibraryOCR").warning(
                 f"GLM-OCR: transformers not installed ({e})"
             )
             return None
         except Exception as e:
-            import logging
             logging.getLogger("LibraryOCR").warning(f"GLM-OCR: failed to load model ({e})")
             return None
 
@@ -478,13 +499,29 @@ class HybridOCREngine:
         try:
             pil_img = self._numpy_to_pil(image)
 
-            result = pipeline(pil_img, truncate=True)
-
-            text = ""
-            if isinstance(result, list):
-                text = result[0].get("generated_text", "")
-            elif isinstance(result, dict):
-                text = result.get("generated_text", "")
+            if isinstance(pipeline, dict) and "model" in pipeline:
+                model = pipeline["model"]
+                processor = pipeline["processor"]
+                device = pipeline["device"]
+                inputs = processor(images=pil_img, return_tensors="pt").to(device)
+                with torch.no_grad():
+                    generated_ids = model.generate(**inputs, max_new_tokens=256)
+                text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            elif isinstance(pipeline, list):
+                text = " ".join(r.get("generated_text", "") for r in pipeline if isinstance(r, dict))
+            else:
+                result = pipeline(pil_img, truncate=True)
+                text = ""
+                if isinstance(result, list):
+                    for item in result:
+                        if isinstance(item, dict):
+                            text += item.get("generated_text", "") + " "
+                        elif isinstance(item, str):
+                            text += item + " "
+                elif isinstance(result, dict):
+                    text = result.get("generated_text", "")
+                else:
+                    text = str(result)
 
             return {"text": text, "confidence": 0.88}
 

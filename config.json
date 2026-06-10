@@ -33,13 +33,12 @@
       "line_segmentation": true
     },
     "glmocr": {
-      "enabled": false,
+      "enabled": true,
       "model_name": "zai-org/GLM-OCR",
       "device": "auto",
       "local_models_dir": "models",
-      "note": "model incompatible with transformers pipeline, requires manual setup"
-    }
-  },
+      "note": "experimental: tries image-text-to-text, direct Vision2Seq loading"
+    },
   "pdf": {
     "enabled": true,
     "dpi": 300,
