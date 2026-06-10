@@ -1,45 +1,96 @@
 # LibOCR — OCR для библиотечных карточек
 
-Автономный оффлайн OCR для распознавания текста с фотографий библиотечных карточек. Поддерживает печатный и рукописный текст, штампы, линии, углы поворота 0–270°.
+Автономный оффлайн OCR для распознавания текста с фотографий библиотечных карточек. Поддерживает печатный и рукописный текст, штампы, линии, углы поворота 0–270°. **Всё в raw_text** — ничего не удаляется, сомнительные элементы помечаются.
 
 ## Требования
 
 - Windows 10/11 (x64)
-- Python 3.11+
-- Tesseract OCR 5.3+
+- **Python 3.11 или 3.12** — версии 3.13+ не поддерживают CUDA
+- Tesseract OCR 5.3+ (для `rus_old` нужен пакет `rus_old.traineddata`)
 - GPU с CUDA (опционально, для EasyOCR и TrOCR)
+
+## Быстрый старт
+
+```batch
+run.bat                — интерактивный режим
+run.bat --auto         — обработать всё в input_files
+run.bat --debug        — сохранять промежуточные изображения
+run.bat --input path   — указать папку
+run.bat --check        — проверка системы
+run.bat --resume       — продолжить batch
+run.bat --reset        — сбросить batch
+
+python main.py --input photos --format md
+python main.py --input photos --mode universal
+python main.py --input photos --workers 4
+python main.py --single photo.jpg --format doc
+```
 
 ## Архитектура
 
-Три OCR движка работают параллельно (четвёртые рассмотрены, но несовместимы):
+Три OCR движка работают по **каскадной схеме** (сначала быстрые, потом точные):
 
-| Engine | Purpose | Model | Conf |
-|--------|---------|-------|------|
-| **EasyOCR** | Printed ru/en | easyocr Reader | per-bbox |
-| **Tesseract** | Printed, adaptive PSM | tesseract.exe | avg per-char |
-| **TrOCR** | Handwritten text | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | ~92% |
-| **GLM-OCR** | Vision OCR (отключён) | `zai-org/GLM-OCR` — несовместим | — |
-| **OCRFeeder** | Desktop OCR (несовместим) | GNOME-приложение, не Python-библиотека | — |
+| Engine | Назначение | Модель | Когда запускается |
+|--------|-----------|--------|-------------------|
+| **EasyOCR** | Печатный ru/en | easyocr Reader | Всегда (с fallback) |
+| **Tesseract** | Печатный, адаптивный PSM | tesseract.exe | Если EasyOCR < 70% |
+| **TrOCR** | Рукописный текст | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | Если все < 60% |
+| **GLM-OCR** | Отключён | `zai-org/GLM-OCR` — несовместим | — |
+| **OCRFeeder** | Несовместим | GNOME-приложение | — |
 
-All HuggingFace models support **local download**: models cached in `models/` via `snapshot_download`, reused without re-downloading.
+Каскадная схема даёт:
+- **EasyOCR** (1-2с) → быстрое распознавание печатного текста
+- **Tesseract** (3-8с) → если EasyOCR не уверен
+- **TrOCR** (10-20с) → только для сложных/рукописных случаев
 
 ## Логика работы
 
-### 1. Загрузка изображения (или PDF)
-- Изображение читается через OpenCV (`np.fromfile` + `cv2.imdecode` — поддержка кириллических путей)
-- **PDF**: извлекаются страницы через `pdf2image`, каждая страница обрабатывается как отдельное изображение
-- **Кеш**: предобработка кешируется (LRU, MD5 хеш) для повторяющихся изображений
+### 1. Определение типа документа
+Перед обработкой изображение анализируется:
+- **photo** — высокая детализация, много текста → профиль `photo`
+- **old_document** — низкий контраст, старая бумага → Sauvola-бинаризация + Tesseract с `rus_old`
+- **blank** — почти пустой лист → пропуск
+- **default** — стандартный CLAHE
 
-### 2. Параллельная обработка тремя OCR движками
+### 2. Загрузка (JPG/PNG/PDF)
+- **Изображения**: OpenCV (`np.fromfile` + `cv2.imdecode` — кириллические пути)
+- **PDF**: PyMuPDF — извлечение страниц без внешних зависимостей
+- **Кеш**: LRU-кеш (MD5 хеш) для повторяющихся изображений
+
+### 3. Каскадная обработка (Cascade OCR)
 ```
-Image → [EasyOCR] → text + confidence
-     → [Tesseract] → text + confidence
-     → [TrOCR] → text + confidence (handwritten specialist)
+Image → [EasyOCR] → если confidence < 70% → [Tesseract] → если всё < 60% → [TrOCR]
 ```
 
-### 3. Определение типа текста
-- Анализ распознанного текста: `handwritten` / `printed` / `unknown`
-- Критерии: наличие специфичных символов (ё, і, є), длина слов, паттерны
+Каждый движок замеряет своё время (`engine_times`). Лучший результат выбирается по max confidence (`best_engine`).
+
+### 4. EasyOCR fallback
+Если EasyOCR с `paragraph=True` не дал текста — автоматический перезапуск с `paragraph=False`.
+
+### 5. Постобработка
+- Извлечение дат, инвентарных номеров, штампов
+- Поиск библиотечных терминов через словарь
+- Fuzzy-коррекция по словарю (Левенштейн ≤ 1)
+
+### 6. Контекстная коррекция (LanguageModelCorrector)
+- Загрузка `models/ru_bigrams.json` — частоты пар слов
+- Исправление слов с расстоянием Левенштейна ≤ 2 с учётом соседних слов
+- Пример: "читательский билет" → исправление "билет" в контексте "читательский"
+
+### 7. Кросс-проверка движков
+- Выравнивание строк из 3 движков
+- Консенсус 2 из 3 → `consensus_validated: true`
+- Расхождения → `possible_errors`
+
+### 8. Детекция структуры текста
+- Заголовки (короткие строки, ALL CAPS) → `## Заголовок`
+- Абзацы (объединение строк по пустым) → параграфы
+- Списки (строки с `-`, `*`, `1.`) → маркированные списки
+- Колонтитулы и номера страниц → отдельные поля
+
+### 9. Сохранение
+- **JSON** — полная структура со всеми полями
+- **TXT** / **DOC** (Word) / **MD** (Markdown) — по выбору (`--format`)
 
 ### 4. Выбор приоритетного движка
 - Для `handwritten` → TrOCR (если доступен)
@@ -227,21 +278,38 @@ python main.py --single photo.jpg
 | `--reset` | Сбросить состояние batch |
 | `--single F` | Обработать один файл |
 | `--retry N` | Число повторов при ошибке |
+| `--format` | Формат вывода: `txt` (по умолч.), `doc` (Word), `md` (Markdown) |
+| `--mode` | Режим: `library` (библиотечные поля) или `universal` (только текст) |
+| `--workers N` | Число параллельных потоков для batch (по умолч. 1) |
 
 ## Структура проекта
 
 ```
 LibOCR/
 ├── main.py                    — точка входа, CLI
-├── ocr_engine.py              — 3 engines: EasyOCR + Tesseract + TrOCR (GLM-OCR отключён)
-├── image_processor.py         — preprocessing: углы, CLAHE, линии, штампы
-├── postprocessor.py           — разбор: имена, даты, номера, штампы
+├── ocr_engine.py              — 3 engines: EasyOCR + Tesseract + TrOCR (каскад)
+├── image_processor.py         — preprocessing + автоопределение типа документа
+├── postprocessor.py           — разбор текста, структура, коррекция
+├── binarization.py            — Sauvola/Niblack/Otsu адаптивная бинаризация
+├── language_corrector.py      — контекстная коррекция (биграммы)
+├── pdf_processor.py           — PDF → изображения (PyMuPDF)
+├── preprocessing_cache.py     — LRU-кеш предобработки (MD5)
 ├── batch_state.py             — resume/reset state
-├── utils.py                   — логирование, I/O, memory cleanup
+├── utils.py                   — логирование, I/O, save_txt/doc/md
 ├── dictionaries/
 │   ├── library_dictionary.json — библиотечные термины
 │   └── dictionary_loader.py   — fuzzy-поиск, Levenshtein
+├── models/
+│   ├── ru_bigrams.json         — биграммы для контекстной коррекции
+│   └── Kansallisarkisto_*     — TrOCR модель (скачивается при первом запуске)
 ├── config.json               — вся конфигурация
+├── requirements.txt           — зависимости
+├── run.bat                   — Windows launcher
+├── install.ps1               — PowerShell installer
+├── README.md                 — документация
+├── .gitignore                — no venv, logs, output_texts, debug/, error_reports/, HuggingFace cache
+└── agents.md / claude.md      — agent instructions & product rules
+```
 ├── requirements.txt           — зависимости
 ├── run.bat                    — запуск (Windows)
 ├── install.ps1                — установщик
