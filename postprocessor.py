@@ -103,6 +103,7 @@ class PostProcessor:
 
         full_raw_text = "\n\n".join(raw_parts)
         formatted_text = self._format_text_structure(full_raw_text)
+        hf = self.extract_headers_footers(full_raw_text)
 
         return {
             "filename": filename,
@@ -133,6 +134,10 @@ class PostProcessor:
             },
             "warnings": ocr_result.get("warnings", []),
             "language": language,
+            "document_type": metadata.get("document_type", "default"),
+            "headers": hf.get("headers", []),
+            "footers": hf.get("footers", []),
+            "page_numbers": hf.get("footers", []),
             "best_engine": ocr_result.get("best_engine", {}),
             "engine_times": ocr_result.get("engine_times", {}),
             "consensus_validated": len(possible_errors) == 0,
@@ -248,12 +253,15 @@ class PostProcessor:
 
     def _detect_language(self, text: str) -> str:
         cyrillic = sum(1 for c in text if "\u0400" <= c <= "\u04FF")
+        old_ru = sum(1 for c in text if c in "ѣѢѲѳѴѵіІѣѢ")
         latin = sum(
             1
             for c in text
             if c.isalpha() and not ("\u0400" <= c <= "\u04FF")
         )
 
+        if old_ru > 3:
+            return "ru_old"
         if cyrillic > latin * 2:
             return "ru"
         elif latin > cyrillic * 2:
@@ -381,3 +389,27 @@ class PostProcessor:
     @staticmethod
     def _is_list_item(line: str) -> bool:
         return any(line.startswith(p) for p in ["- ", "* ", "• ", "1.", "2.", "3.", "4.", "5.", "– ", "— "])
+
+    def extract_headers_footers(self, text: str) -> Dict[str, List[str]]:
+        lines = text.split("\n")
+        headers = []
+        footers = []
+        main_lines = []
+        for i, line in enumerate(lines):
+            s = line.strip()
+            if not s:
+                main_lines.append(line)
+                continue
+            if len(s) < 30 and any(c.isdigit() for c in s) and not any(c.isalpha() for c in s):
+                footers.append(s)
+                continue
+            if len(s) < 20 and s.isupper():
+                if i < len(lines) // 4:
+                    headers.append(s)
+                elif i > len(lines) * 3 // 4:
+                    footers.append(s)
+                else:
+                    main_lines.append(line)
+            else:
+                main_lines.append(line)
+        return {"headers": headers, "footers": footers, "main_text": "\n".join(main_lines)}

@@ -72,6 +72,19 @@ def parse_arguments():
         choices=["txt", "doc", "md"],
         help="Формат вывода: txt (по умолч.), doc (Word), md (Markdown)",
     )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default=None,
+        choices=["library", "universal"],
+        help="Режим: library (с библиотечными полями) или universal (только текст)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Число параллельных потоков для batch (по умолч. 1)",
+    )
     return parser.parse_args()
 
 
@@ -260,6 +273,8 @@ def main():
         config = load_config()
         logger = setup_logging(config)
         output_format = args.format or config.get("output", {}).get("format", "txt")
+        app_mode = args.mode or config.get("output", {}).get("mode", "library")
+        num_workers = args.workers or config.get("processing", {}).get("max_workers", 1)
     except Exception as e:
         import sys
         from pathlib import Path
@@ -373,8 +388,35 @@ def main():
         ncols=100,
         bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
     ) as pbar:
-        for img_path in images:
-            result = process_single_image(
+        if num_workers > 1:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            with ThreadPoolExecutor(max_workers=num_workers) as pool:
+                futures = {}
+                for img_path in images:
+                    future = pool.submit(
+                        process_single_image,
+                        img_path, image_processor, ocr_engine, post_processor,
+                        input_dir, output_dir, debug_dir, logger, config,
+                        debug_mode=args.debug, max_retries=max_retries,
+                        retry_delay=retry_delay, output_format=output_format,
+                    )
+                    futures[future] = img_path
+                for future in as_completed(futures):
+                    img_path = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        result = {"file": img_path.name, "status": "ERROR", "warnings": str(e)}
+                    results.append(result)
+                    if result["status"] == "OK":
+                        batch_state.mark_completed(img_path)
+                    else:
+                        batch_state.mark_failed(img_path, result.get("warnings", str(e)))
+                    pbar.update(1)
+                    memory_cleanup()
+        else:
+            for img_path in images:
+                result = process_single_image(
                 img_path,
                 image_processor,
                 ocr_engine,

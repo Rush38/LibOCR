@@ -393,6 +393,10 @@ class HybridOCREngine:
         oem = self.tesser_config.get("oem", 3)
         psm = self.tesser_config.get("psm", 6)
         lang = self.tesser_config["languages"]
+        old_ru = self.tesser_config.get("old_russian", False)
+
+        if old_ru:
+            lang = "rus_old+rus+eng"
 
         adaptive_psm = self.tesser_config.get("adaptive_psm", False)
         if adaptive_psm:

@@ -8,8 +8,30 @@ class ImageProcessor:
     def __init__(self, config, debug_dir: Optional[Path] = None):
         self.config = config
         self.prep = config.get("preprocessing", {})
+        self.profiles = self.prep.get("profiles", {})
         self.debug_dir = debug_dir
         self._debug_count = 0
+
+    def detect_document_type(self, image: np.ndarray) -> str:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        h, w = gray.shape
+        text_pixels = cv2.countNonZero(cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1])
+        density = text_pixels / (h * w) if h * w > 0 else 0
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        mean_val = gray.mean()
+        if density > 0.15 and laplacian_var > 50:
+            return "photo"
+        if density < 0.03 and laplacian_var < 10:
+            return "blank"
+        if mean_val < 100 and laplacian_var < 20:
+            return "old_document"
+        return "default"
+
+    def select_profile(self, doc_type: str) -> str:
+        profile_setting = self.prep.get("profile", "default")
+        if profile_setting != "auto":
+            return profile_setting
+        return self.profiles.get(doc_type, {}).get("profile", "default") if doc_type in self.profiles else doc_type if doc_type in self.profiles else "default"
 
     def process(
         self, image_path: Path
@@ -28,6 +50,19 @@ class ImageProcessor:
             "columns_count": 1,
             "original_size": (original_w, original_h),
         }
+
+        doc_type = self.detect_document_type(img)
+        metadata["document_type"] = doc_type
+
+        import logging
+        logger = logging.getLogger("LibraryOCR")
+        logger.info(f"Document type: {doc_type}")
+
+        profile = self.select_profile(doc_type)
+        if profile == "old_document":
+            from binarization import sauvola_threshold
+            binary = sauvola_threshold(img, window_size=41, k=0.25)
+            img = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
 
         img = self._preprocess_pipeline(img, image_path.stem, metadata)
 
