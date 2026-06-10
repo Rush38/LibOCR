@@ -235,6 +235,8 @@ def main():
     else:
         input_dir = root / config["paths"]["input_dir"]
 
+    output_dir = root / config["paths"]["output_dir"]
+
     input_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
