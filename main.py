@@ -349,6 +349,19 @@ def main():
 
     (root / config["paths"]["log_dir"]).mkdir(parents=True, exist_ok=True)
 
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_mem = round(torch.cuda.get_device_properties(0).total_memory / 1024**3, 1)
+            print_colored(f"[GPU] {gpu_name} ({gpu_mem} GB) — CUDA доступен", Colors.GREEN)
+        else:
+            print_colored("[WARN] CUDA не доступен — все движки работают на CPU", Colors.YELLOW)
+            print_colored("       Установите NVIDIA Driver + CUDA Toolkit 12.x", Colors.YELLOW)
+            print_colored("       Или используйте Python 3.11/3.12 вместо текущей версии", Colors.YELLOW)
+    except Exception:
+        print_colored("[WARN] torch не найден — все движки работают на CPU", Colors.YELLOW)
+
     debug_dir = None
     if args.debug:
         debug_dir = root / config["paths"]["debug_dir"]
