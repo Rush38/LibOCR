@@ -225,3 +225,60 @@ class ImageProcessor:
                 return blocks, len(blocks)
 
         return [img], 1
+
+    def segment_handwritten_lines(
+        self, image: np.ndarray, min_height: int = 10
+    ) -> List[Tuple[int, int]]:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, binary = cv2.threshold(
+            gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+        )
+        h_proj = binary.sum(axis=1) // 255
+        h, w = image.shape[:2]
+        threshold = h_proj.max() * 0.05 if h_proj.max() > 0 else 0
+        lines = []
+        start = None
+        for y in range(h):
+            if h_proj[y] > threshold:
+                if start is None:
+                    start = y
+            else:
+                if start is not None:
+                    height = y - start
+                    if height >= min_height:
+                        lines.append((start, height))
+                    start = None
+        if start is not None and h - start >= min_height:
+            lines.append((start, h - start))
+        return lines
+
+    def extract_stamp_text(self, image: np.ndarray) -> str:
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        red_lower1 = np.array([0, 50, 50])
+        red_upper1 = np.array([10, 255, 255])
+        red_lower2 = np.array([160, 50, 50])
+        red_upper2 = np.array([180, 255, 255])
+        blue_lower = np.array([100, 50, 50])
+        blue_upper = np.array([140, 255, 255])
+
+        mask_red = cv2.inRange(hsv, red_lower1, red_upper1)
+        mask_red |= cv2.inRange(hsv, red_lower2, red_upper2)
+        mask_blue = cv2.inRange(hsv, blue_lower, blue_upper)
+        mask = cv2.bitwise_or(mask_red, mask_blue)
+
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        mask = cv2.dilate(mask, kernel, iterations=1)
+
+        x, y, w, h = cv2.boundingRect(mask)
+        if w < 20 or h < 20:
+            return ""
+        stamp_region = image[y : y + h, x : x + w]
+        try:
+            import easyocr
+            reader = easyocr.Reader(["ru", "en"], gpu=False, verbose=False)
+            results = reader.readtext(stamp_region, paragraph=False)
+            texts = [r[1] for r in results if len(r) >= 2 and r[1].strip()]
+            return "; ".join(texts)
+        except Exception:
+            return ""

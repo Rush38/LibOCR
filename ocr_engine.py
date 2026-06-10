@@ -1,5 +1,6 @@
 import pytesseract
 import numpy as np
+import cv2
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Dict, Any, Optional, List
 from pathlib import Path
@@ -345,10 +346,31 @@ class HybridOCREngine:
         except Exception as e:
             return {"text": "", "confidence": 0.0, "error": str(e)}
 
+    def auto_select_psm(self, image: np.ndarray) -> int:
+        h, w = image.shape[:2]
+        ratio = w / h
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        text_pixels = cv2.countNonZero(255 - binary)
+        total_pixels = h * w
+        density = text_pixels / total_pixels if total_pixels else 0
+
+        if ratio > 2.0:
+            return 6
+        if density < 0.02:
+            return 3
+        if 0.02 <= density <= 0.08:
+            return 7
+        return 11
+
     def _run_tesseract(self, image: np.ndarray) -> Dict[str, Any]:
         oem = self.tesser_config.get("oem", 3)
         psm = self.tesser_config.get("psm", 6)
         lang = self.tesser_config["languages"]
+
+        adaptive_psm = self.tesser_config.get("adaptive_psm", False)
+        if adaptive_psm:
+            psm = self.auto_select_psm(image)
 
         custom_config = f"--oem {oem} --psm {psm} -c tessedit_do_invert=0"
 
@@ -367,7 +389,7 @@ class HybridOCREngine:
         confs = [int(c) for c in data["conf"] if int(c) > 0]
         confidence = float(np.mean(confs)) if confs else 0.0
 
-        return {"text": text, "confidence": confidence}
+        return {"text": text, "confidence": confidence, "psm_used": psm}
 
     def _run_trocr(self, image: np.ndarray) -> Dict[str, Any]:
         if self._trocr_model is None or self._trocr_processor is None:

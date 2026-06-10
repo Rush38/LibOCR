@@ -348,15 +348,43 @@ def main():
     with open(csv_path, "w", encoding="utf-8-sig") as f:
         f.write(
             "file;detected_angle;corrected;text_type;primary_engine;"
-            "library_terms;confidence;language;warnings\n"
+            "library_terms;confidence;language;warnings;"
+            "needs_review_flag;consensus_validated\n"
         )
         for r in results:
+            needs_review = "YES" if r.get("confidence", "0%").replace("%", "").replace(",", ".").isdigit() and float(r["confidence"].replace("%", "").replace(",", ".")) < 60 else ""
             f.write(
                 f"{r['file']};{r['detected_angle']};{r['corrected']};"
                 f"{r.get('text_type', '')};{r.get('primary_engine', '')};"
                 f"{r.get('library_terms', '')};"
-                f"{r['confidence']};{r['language']};{r['warnings']}\n"
+                f"{r['confidence']};{r['language']};{r['warnings']};"
+                f"{needs_review};{r.get('consensus_validated', '')}\n"
             )
+
+    avg_conf = {}
+    engine_success = {}
+    for r in results:
+        if r["status"] == "OK":
+            ttype = r.get("text_type", "unknown")
+            conf = r.get("confidence", "0%").replace("%", "")
+            try:
+                conf_val = float(conf)
+            except ValueError:
+                conf_val = 0.0
+            avg_conf[ttype] = avg_conf.get(ttype, []) + [conf_val]
+            engine = r.get("primary_engine", "unknown")
+            engine_success[engine] = engine_success.get(engine, 0) + 1
+
+    if avg_conf:
+        print_colored("  Статистика по типам текста:", Colors.CYAN)
+        for ttype, confs in sorted(avg_conf.items()):
+            avg = sum(confs) / len(confs)
+            print_colored(f"    {ttype}: {avg:.1f}% ({len(confs)} файлов)", Colors.BLUE)
+
+    if engine_success:
+        print_colored("  Успешность по движкам:", Colors.CYAN)
+        for eng, cnt in sorted(engine_success.items()):
+            print_colored(f"    {eng}: {cnt} файлов", Colors.BLUE)
 
     ok_count = sum(1 for r in results if r["status"] == "OK")
     err_count = sum(1 for r in results if r["status"] == "ERROR")

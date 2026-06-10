@@ -95,7 +95,7 @@ def get_image_files(directory):
     path = get_project_root() / directory
     if not path.exists():
         return []
-    extensions = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp", "*.tiff", "*.tif"]
+    extensions = ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.bmp", "*.tiff", "*.tif", "*.pdf"]
     files = []
     for ext in extensions:
         files.extend(path.glob(ext))

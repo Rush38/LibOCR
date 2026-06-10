@@ -65,6 +65,25 @@ class PostProcessor:
             ocr_result.get("trocr_conf", 0.0),
         )
 
+        possible_errors = self.cross_validate_engines(
+            easy_text, tess_text, trocr_text
+        )
+
+        lang_corrector = getattr(self, "_lang_corrector", None)
+        if lang_corrector:
+            words = raw_text.split()
+            for i, w in enumerate(words):
+                prev = words[i - 1] if i > 0 else None
+                nxt = words[i + 1] if i < len(words) - 1 else None
+                corrected, _ = lang_corrector.correct_context(w, prev, nxt)
+                if corrected != w:
+                    fuzzy_corrections.append({
+                        "original": w,
+                        "corrected": corrected,
+                        "distance": 1,
+                        "engine": "bigram",
+                    })
+
         raw_parts = [
             f"[ОСНОВНОЙ: {primary_engine.upper()}] ({text_type})",
             raw_text,
@@ -96,6 +115,7 @@ class PostProcessor:
             "library_terms": library_terms,
             "fuzzy_corrections": fuzzy_corrections,
             "raw_text": full_raw_text,
+            "possible_errors": possible_errors,
             "alternatives": {
                 "easyocr_text": easy_text,
                 "tesseract_text": tess_text,
@@ -111,6 +131,7 @@ class PostProcessor:
             },
             "warnings": ocr_result.get("warnings", []),
             "language": language,
+            "consensus_validated": len(possible_errors) == 0,
         }
 
     def _extract_readers(self, text: str) -> Tuple[List[str], List[str]]:
@@ -280,3 +301,27 @@ class PostProcessor:
         if tess_conf >= easy_conf:
             return "tesseract"
         return "easyocr"
+
+    def register_language_corrector(self, corrector):
+        self._lang_corrector = corrector
+
+    def cross_validate_engines(
+        self, easy_text: str, tess_text: str, trocr_text: str
+    ) -> List[str]:
+        errors = []
+        easy_lines = [l.strip() for l in easy_text.split("\n") if l.strip()]
+        tess_lines = [l.strip() for l in tess_text.split("\n") if l.strip()]
+        trocr_lines = [l.strip() for l in trocr_text.split("\n") if l.strip()]
+
+        max_lines = max(len(easy_lines), len(tess_lines), len(trocr_lines))
+        for i in range(max_lines):
+            line1 = easy_lines[i] if i < len(easy_lines) else ""
+            line2 = tess_lines[i] if i < len(tess_lines) else ""
+            line3 = trocr_lines[i] if i < len(trocr_lines) else ""
+
+            agreement = sum(1 for t in [line1, line2, line3] if t)
+            if agreement < 2 and agreement > 0:
+                errors.append(
+                    f"строка {i+1}: расхождение между движками"
+                )
+        return errors
