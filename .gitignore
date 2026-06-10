@@ -44,6 +44,9 @@ logs/
 debug/
 error_reports/
 
+# User input files (not tracked)
+input_files/
+
 # Python packages (portable)
 Lib/
 Library/
