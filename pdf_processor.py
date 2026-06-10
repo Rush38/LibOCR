@@ -6,10 +6,10 @@ import logging
 logger = logging.getLogger("LibraryOCR")
 
 try:
-    from pdf2image import convert_from_path
-    HAS_PDF2IMAGE = True
+    import fitz
+    HAS_FITZ = True
 except ImportError:
-    HAS_PDF2IMAGE = False
+    HAS_FITZ = False
 
 
 class PDFProcessor:
@@ -19,27 +19,32 @@ class PDFProcessor:
     def extract_images_from_pdf(
         self, pdf_path: Path
     ) -> List[np.ndarray]:
-        if not HAS_PDF2IMAGE:
-            logger.error("PDF support requires pdf2image. Install: pip install pdf2image")
+        if not HAS_FITZ:
+            logger.error("PDF support requires PyMuPDF. Install: pip install PyMuPDF")
             return []
 
         dpi = self.config.get("dpi", 300)
         first_only = self.config.get("first_page_only", False)
         max_pages = self.config.get("max_pages", 50)
-        color = self.config.get("color_conversion", "RGB")
-        poppler = self.config.get("poppler_path", None)
+        zoom = dpi / 72
 
         try:
-            pages = convert_from_path(
-                str(pdf_path),
-                dpi=dpi,
-                first_page=1,
-                last_page=1 if first_only else max_pages,
-                fmt="jpeg",
-                use_pdftocairo=True,
-                poppler_path=poppler if poppler and Path(poppler).exists() else None,
-            )
-            images = [np.array(page.convert(color)) for page in pages]
+            doc = fitz.open(str(pdf_path))
+            total = min(len(doc), max_pages)
+            pages_to_process = [doc[i] for i in range(total)] if not first_only else [doc[0]]
+
+            images = []
+            for page in pages_to_process:
+                mat = fitz.Matrix(zoom, zoom)
+                pix = page.get_pixmap(matrix=mat)
+                img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
+                    pix.height, pix.width, pix.n
+                )
+                if pix.n == 4:
+                    img = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+                images.append(img)
+
+            doc.close()
             logger.info(f"PDF {pdf_path.name}: {len(images)} pages extracted")
             return images
         except Exception as e:
@@ -53,14 +58,15 @@ class PDFProcessor:
             "author": "",
             "creation_date": "",
         }
-        if not HAS_PDF2IMAGE:
+        if not HAS_FITZ:
             return meta
         try:
-            from pdf2image.pdf2image import pdfinfo_from_path
-            info = pdfinfo_from_path(str(pdf_path))
-            meta["pages"] = info.get("Pages", 0)
-            meta["author"] = info.get("Author", "")
-            meta["creation_date"] = info.get("CreationDate", "")
+            doc = fitz.open(str(pdf_path))
+            meta["pages"] = len(doc)
+            info = doc.metadata
+            meta["author"] = info.get("author", "")
+            meta["creation_date"] = info.get("creationDate", "")
+            doc.close()
         except Exception:
             pass
         return meta

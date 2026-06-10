@@ -45,8 +45,7 @@
     "first_page_only": false,
     "max_pages": 50,
     "color_conversion": "RGB",
-    "auto_rotate": true,
-    "poppler_path": "bin/poppler"
+    "auto_rotate": true
   },
   "preprocessing": {
     "clahe": {

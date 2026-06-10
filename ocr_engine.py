@@ -387,7 +387,7 @@ class HybridOCREngine:
         )
 
         confs = [int(c) for c in data["conf"] if int(c) > 0]
-        confidence = float(np.mean(confs)) if confs else 0.0
+        confidence = (float(np.mean(confs)) / 100.0) if confs else 0.0
 
         return {"text": text, "confidence": confidence, "psm_used": psm}
 
@@ -403,6 +403,8 @@ class HybridOCREngine:
             from PIL import Image
             pil_img = Image.fromarray(image)
 
+            self._trocr_model.generation_config.max_length = 256
+
             inputs = self._trocr_processor(
                 images=pil_img, return_tensors="pt"
             )
@@ -416,7 +418,6 @@ class HybridOCREngine:
                 generated_ids = self._trocr_model.generate(
                     **inputs,
                     max_new_tokens=256,
-                    max_length=256,
                     num_beams=4,
                     early_stopping=True,
                 )

@@ -11,23 +11,24 @@
 
 ## Архитектура
 
-Four OCR engines run in parallel:
+Три OCR движка работают параллельно (четвёртые рассмотрены, но несовместимы):
 
 | Engine | Purpose | Model | Conf |
 |--------|---------|-------|------|
 | **EasyOCR** | Printed ru/en | easyocr Reader | per-bbox |
-| **Tesseract** | Printed, flexible PSM/OEM | tesseract.exe | avg per-char |
+| **Tesseract** | Printed, adaptive PSM | tesseract.exe | avg per-char |
 | **TrOCR** | Handwritten text | `Kansallisarkisto/cyrillic-large-handwritten` (HuggingFace) | ~92% |
-| **GLM-OCR** | Vision OCR (отключён) | `zai-org/GLM-OCR` — несовместим с transformers pipeline | — |
+| **GLM-OCR** | Vision OCR (отключён) | `zai-org/GLM-OCR` — несовместим | — |
 | **OCRFeeder** | Desktop OCR (несовместим) | GNOME-приложение, не Python-библиотека | — |
 
 All HuggingFace models support **local download**: models cached in `models/` via `snapshot_download`, reused without re-downloading.
 
 ## Логика работы
 
-### 1. Загрузка изображения
+### 1. Загрузка изображения (или PDF)
 - Изображение читается через OpenCV (`np.fromfile` + `cv2.imdecode` — поддержка кириллических путей)
-- Применяется предобработка: denoise → angle correction → CLAHE → line removal → stamp suppression → column splitting
+- **PDF**: извлекаются страницы через `pdf2image`, каждая страница обрабатывается как отдельное изображение
+- **Кеш**: предобработка кешируется (LRU, MD5 хеш) для повторяющихся изображений
 
 ### 2. Параллельная обработка тремя OCR движками
 ```
@@ -110,6 +111,11 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
 2. **Приоритетный движок** — на основе типа: TrOCR для рукописного, Tesseract/EasyOCR для печатного
 3. **Все результаты в одном файле** — каждый движок отображается в `raw_text` с тегом `[ОСНОВНОЙ: TROCR] (handwritten)`
 4. **Поля `text_type`** и **`primary_engine`** — указывают тип текста и выбранный основной движок
+5. **Адаптивный PSM** — Tesseract автоматически выбирает PSM режим (3/6/7/11) под изображение
+6. **Сегментация строк для TrOCR** — горизонтальная проекция + адаптивная бинаризация для рукописного текста
+7. **Кросс-проверка** — выравнивание строк из 3 движков, поиск консенсуса (2 из 3), пометка расхождений
+8. **Детекция штампов** — HSV-фильтрация красного/синего, отдельный OCR на области штампа
+9. **Контекстная коррекция** — биграммы библиотечных терминов, Levenshtein ≤ 2 с учётом соседних слов
 
 ## Конфигурация
 
@@ -121,13 +127,15 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
     "input_dir": "input_files",
     "output_dir": "output_texts",
     "log_dir": "logs",
-    "debug_dir": "debug"
+    "debug_dir": "debug",
+    "error_reports_dir": "error_reports"
   },
   "ocr": {
     "easyocr": {
       "enabled": true,
       "languages": ["ru", "en"],
       "gpu": true,
+      "confidence_threshold": 0.3,
       "paragraph": true
     },
     "tesseract": {
@@ -135,20 +143,34 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
       "path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
       "languages": "rus+eng",
       "oem": 3,
-      "psm": 6
+      "psm": 6,
+      "dpi": 300,
+      "adaptive_psm": true
     },
     "trocr": {
       "enabled": true,
       "model_name": "Kansallisarkisto/cyrillic-large-handwritten",
       "device": "auto",
-      "local_models_dir": "models"
+      "stride": 128,
+      "local_models_dir": "models",
+      "line_segmentation": true
     },
     "glmocr": {
-      "enabled": true,
+      "enabled": false,
       "model_name": "zai-org/GLM-OCR",
       "device": "auto",
-      "local_models_dir": "models"
+      "local_models_dir": "models",
+      "note": "model incompatible"
     }
+  },
+  "pdf": {
+    "enabled": true,
+    "dpi": 300,
+    "first_page_only": false,
+    "max_pages": 50,
+    "color_conversion": "RGB",
+    "auto_rotate": true,
+    "poppler_path": "bin/poppler"
   },
   "preprocessing": {
     "clahe": { "clip_limit": 2.0, "tile_grid_size": [8, 8] },
@@ -160,12 +182,22 @@ Fuzzy-поиск: расстояние Левенштейна ≤ 1.
       ],
       "sat_reduction": 0.0
     },
-    "angle_correction": { "max_deviation": 45.0 }
+    "angle_correction": { "max_deviation": 45.0 },
+    "cache": { "enabled": true, "maxsize": 100 },
+    "stamp_detection": { "enabled": true, "min_area": 400 }
   },
   "processing": {
+    "max_workers": 2,
     "timeout_engine": 60,
+    "timeout_image": 180,
     "retry": 3,
     "retry_delay": 2
+  },
+  "output": {
+    "encoding": "utf-8-sig",
+    "csv_sep": ";",
+    "max_log_mb": 10,
+    "log_backups": 5
   }
 }
 ```

@@ -23,6 +23,7 @@ from batch_state import load_batch_state
 from image_processor import ImageProcessor
 from ocr_engine import HybridOCREngine
 from postprocessor import PostProcessor
+from pdf_processor import PDFProcessor
 
 
 def parse_arguments():
@@ -80,13 +81,30 @@ def process_single_image(
     retry_delay=2,
 ):
     filename = img_path.name
+    is_pdf = img_path.suffix.lower() == ".pdf"
     json_path = make_output_subdir(img_path, input_dir, output_dir).with_suffix(".json")
     txt_path = json_path.with_suffix(".txt")
     start_time = time.time()
 
     for attempt in range(max_retries):
         try:
-            blocks, metadata = image_processor.process(img_path)
+            is_pdf = img_path.suffix.lower() == ".pdf"
+            if is_pdf:
+                pdf_proc = PDFProcessor(config)
+                page_images = pdf_proc.extract_images_from_pdf(img_path)
+                if not page_images:
+                    raise ValueError(f"Не удалось извлечь страницы из PDF: {img_path.name}")
+                blocks = page_images
+                metadata = {
+                    "detected_angle": 0.0,
+                    "corrected": False,
+                    "stamps_detected": 0,
+                    "columns_count": 1,
+                    "original_size": (page_images[0].shape[1], page_images[0].shape[0]),
+                }
+                logger.info(f"PDF {img_path.name}: {len(blocks)} pages")
+            else:
+                blocks, metadata = image_processor.process(img_path)
 
             if debug_mode and debug_dir:
                 import cv2
@@ -378,13 +396,13 @@ def main():
             engine_success[engine] = engine_success.get(engine, 0) + 1
 
     if avg_conf:
-        print_colored("  Статистика по типам текста:", Colors.CYAN)
+        print_colored("  Статистика по типам текста:", Colors.MAGENTA)
         for ttype, confs in sorted(avg_conf.items()):
             avg = sum(confs) / len(confs)
             print_colored(f"    {ttype}: {avg:.1f}% ({len(confs)} файлов)", Colors.BLUE)
 
     if engine_success:
-        print_colored("  Успешность по движкам:", Colors.CYAN)
+        print_colored("  Успешность по движкам:", Colors.MAGENTA)
         for eng, cnt in sorted(engine_success.items()):
             print_colored(f"    {eng}: {cnt} файлов", Colors.BLUE)
 
