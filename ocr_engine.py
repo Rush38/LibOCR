@@ -2,7 +2,7 @@ import pytesseract
 import numpy as np
 import cv2
 import logging
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
@@ -344,18 +344,23 @@ class HybridOCREngine:
                 if gotocr_result.get("error"):
                     warnings.append(f"GOT-OCR: {gotocr_result['error']}")
             else:
-                with ThreadPoolExecutor(max_workers=4) as executor:
-                    f_easy = executor.submit(self._run_easyocr, image)
-                    f_tess = executor.submit(self._run_tesseract, image)
-                    f_troc = executor.submit(self._run_trocr, image)
-                    f_glm = executor.submit(self._run_glmocr, image)
+                engines_config = [
+                    ("easyocr", self._run_easyocr, timeout, "Распознавание печатного текста..."),
+                    ("tesseract", self._run_tesseract, timeout, "Распознавание через Tesseract..."),
+                    ("trocr", self._run_trocr, timeout * 2, "Распознавание рукописного текста..."),
+                    ("paddleocr", self._run_paddleocr, timeout, "Распознавание через PaddleOCR..."),
+                    ("suryaocr", self._run_suryaocr, timeout, "Распознавание через Surya OCR..."),
+                    ("doctr", self._run_doctr, timeout, "Распознавание через docTR..."),
+                    ("gotocr", self._run_gotocr, timeout, "Распознавание через GOT-OCR2..."),
+                ]
+                with ThreadPoolExecutor(max_workers=7) as executor:
+                    futures = {}
+                    for name, runner, t_out, msg in engines_config:
+                        print(f"  [{name}] {msg}")
+                        futures[executor.submit(runner, image)] = (name, t_out)
 
-                    for name, future, t_out in [
-                        ("easyocr", f_easy, timeout),
-                        ("tesseract", f_tess, timeout),
-                        ("trocr", f_troc, timeout * 2),
-                        ("glmocr", f_glm, timeout * 2),
-                    ]:
+                    for future in as_completed(futures):
+                        name, t_out = futures[future]
                         t0 = tmod.time()
                         t_start = dt.datetime.now().strftime("%H:%M:%S")
                         try:
@@ -364,8 +369,7 @@ class HybridOCREngine:
                             engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": dur}
                             results[name] = res
                             if res.get("error"):
-                                msg = f"{name.capitalize()}: {res['error']}"
-                                warnings.append(msg)
+                                warnings.append(f"{name.capitalize()}: {res['error']}")
                         except FuturesTimeoutError:
                             warnings.append(f"{name.capitalize()}: timeout истекло ({t_out}с)")
                             engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": t_out, "error": "timeout"}

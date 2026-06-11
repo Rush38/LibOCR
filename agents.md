@@ -190,7 +190,7 @@ Also produces:
 - [ ] `.gitignore` covers `libraries/`, `__pycache__/`, `output_texts/`, `logs/`, `debug/`, `error_reports/`, `~/.cache/huggingface/`
 
 ## Key Decisions
-- Hybrid OCR: EasyOCR + Tesseract + TrOCR (каскадный режим, все 3 движка всегда запускаются)
+- Hybrid OCR: EasyOCR + Tesseract + TrOCR + PaddleOCR + Surya + docTR + GOT-OCR2 (параллельно 7 воркеров)
 - TrOCR: `Kansallisarkisto/cyrillic-large-handwritten` — CER=4%, 0.6B, Apache 2.0, lazy-loaded, GPU-auto
 - Postprocessor marks doubtful items but NEVER deletes from `raw_text`
 - Dictionary: `library_terms[]` + `fuzzy_corrections[]` from `dictionaries/library_dictionary.json`
