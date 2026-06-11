@@ -157,7 +157,7 @@ class HybridOCREngine:
                     logger.info("TrOCR: fixed tokenizer_class TokenizersBackend -> RobertaTokenizer")
             self._trocr_image_processor = ViTImageProcessor.from_pretrained(load_from)
             self._trocr_tokenizer = AutoTokenizer.from_pretrained(load_from)
-            logger.info(f"TrOCR: model loaded successfully, device={device}")
+            logger.debug(f"TrOCR: model loaded successfully, device={device}")
             self._trocr_device_name = device
 
         except ImportError as e:
@@ -263,6 +263,7 @@ class HybridOCREngine:
             import datetime as dt
 
             if cascade:
+                print(f"  [EasyOCR] Распознавание печатного текста...")
                 t0 = tmod.time()
                 t0_str = dt.datetime.now().strftime("%H:%M:%S")
                 easy_result = self._run_easyocr(image)
@@ -281,6 +282,7 @@ class HybridOCREngine:
                         engine_times["easyocr"]["duration"] = round(tmod.time() - t0, 2)
                         engine_times["easyocr"]["fallback"] = True
 
+                print(f"  [Tesseract] Распознавание через Tesseract...")
                 t2 = tmod.time()
                 t2_str = dt.datetime.now().strftime("%H:%M:%S")
                 tess_result = self._run_tesseract(image)
@@ -291,6 +293,7 @@ class HybridOCREngine:
                     msg = f"Tesseract: {tess_result['error']}"
                     warnings.append(msg)
 
+                print(f"  [TrOCR] Распознавание рукописного текста...")
                 t4 = tmod.time()
                 t4_str = dt.datetime.now().strftime("%H:%M:%S")
                 trocr_result = self._run_trocr(image)
@@ -301,6 +304,7 @@ class HybridOCREngine:
                     msg = f"TrOCR: {trocr_result['error']}"
                     warnings.append(msg)
 
+                print(f"  [PaddleOCR] Распознавание...")
                 t6 = tmod.time()
                 t6_str = dt.datetime.now().strftime("%H:%M:%S")
                 paddle_result = self._run_paddleocr(image)
@@ -310,6 +314,7 @@ class HybridOCREngine:
                 if paddle_result.get("error"):
                     warnings.append(f"PaddleOCR: {paddle_result['error']}")
 
+                print(f"  [Surya OCR] Распознавание...")
                 t8 = tmod.time()
                 t8_str = dt.datetime.now().strftime("%H:%M:%S")
                 surya_result = self._run_suryaocr(image)
@@ -319,6 +324,7 @@ class HybridOCREngine:
                 if surya_result.get("error"):
                     warnings.append(f"SuryaOCR: {surya_result['error']}")
 
+                print(f"  [docTR] Распознавание документов...")
                 t10 = tmod.time()
                 t10_str = dt.datetime.now().strftime("%H:%M:%S")
                 doctr_result = self._run_doctr(image)
@@ -328,6 +334,7 @@ class HybridOCREngine:
                 if doctr_result.get("error"):
                     warnings.append(f"docTR: {doctr_result['error']}")
 
+                print(f"  [GOT-OCR2] Распознавание...")
                 t12 = tmod.time()
                 t12_str = dt.datetime.now().strftime("%H:%M:%S")
                 gotocr_result = self._run_gotocr(image)
