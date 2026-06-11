@@ -49,7 +49,7 @@
       "gpu": true
     },
     "avision": {
-      "enabled": true,
+      "enabled": false,
       "model_name": "AvitoTech/avision",
       "device": "auto",
       "load_in_8bit": true

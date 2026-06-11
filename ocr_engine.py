@@ -832,18 +832,31 @@ class HybridOCREngine:
                     return None
                 load_8bit = av_cfg.get("load_in_8bit", True)
                 device = self._get_trocr_device()
-                from transformers import AutoProcessor, AutoModelForImageTextToText
                 model_name = av_cfg.get("model_name", "AvitoTech/avision")
-                if load_8bit:
-                    model = AutoModelForImageTextToText.from_pretrained(
-                        model_name, torch_dtype=torch.float16, device_map="auto",
-                        load_in_8bit=True, trust_remote_code=True,
-                    )
-                else:
-                    model = AutoModelForImageTextToText.from_pretrained(
-                        model_name, torch_dtype=torch.float16, device_map="auto",
-                        trust_remote_code=True,
-                    )
+                try:
+                    from transformers import AutoProcessor, AutoModelForImageTextToText
+                    if load_8bit:
+                        model = AutoModelForImageTextToText.from_pretrained(
+                            model_name, torch_dtype=torch.float16, device_map="auto",
+                            load_in_8bit=True, trust_remote_code=True,
+                        )
+                    else:
+                        model = AutoModelForImageTextToText.from_pretrained(
+                            model_name, torch_dtype=torch.float16, device_map="auto",
+                            trust_remote_code=True,
+                        )
+                except Exception:
+                    from transformers import AutoProcessor, AutoModelForMultimodalLM
+                    if load_8bit:
+                        model = AutoModelForMultimodalLM.from_pretrained(
+                            model_name, torch_dtype=torch.float16, device_map="auto",
+                            load_in_8bit=True, trust_remote_code=True,
+                        )
+                    else:
+                        model = AutoModelForMultimodalLM.from_pretrained(
+                            model_name, torch_dtype=torch.float16, device_map="auto",
+                            trust_remote_code=True,
+                        )
                 model.eval()
                 processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
                 self._avision_vars = {"model": model, "processor": processor, "device": device}
@@ -862,29 +875,37 @@ class HybridOCREngine:
             return {"text": "", "confidence": 0.0, "error": "A-Vision не загружен"}
         try:
             from PIL import Image as PILImage
-            from qwen_vl_utils import process_vision_info
             pil_img = PILImage.fromarray(image)
             model = reader["model"]
             processor = reader["processor"]
-            messages = [{
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": pil_img, "min_pixels": 4 * 28 * 28, "max_pixels": 1024 * 28 * 28},
-                    {"type": "text", "text": "Извлеки весь текст с изображения. Сохрани структуру: абзацы, заголовки, списки."}
-                ],
-            }]
-            chat_text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            image_inputs, video_inputs = process_vision_info(messages)
-            inputs = processor(text=[chat_text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt")
+            try:
+                from qwen_vl_utils import process_vision_info
+                messages = [{
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "image": pil_img, "min_pixels": 4 * 28 * 28, "max_pixels": 1024 * 28 * 28},
+                        {"type": "text", "text": "Извлеки весь текст с изображения. Сохрани структуру: абзацы, заголовки, списки."}
+                    ],
+                }]
+                chat_text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                image_inputs, video_inputs = process_vision_info(messages)
+                inputs = processor(text=[chat_text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt")
+            except Exception:
+                inputs = processor(images=pil_img, text="Извлеки весь текст с изображения.", return_tensors="pt")
             device = reader.get("device", "cpu")
             inputs = {k: v.to(device) if hasattr(v, 'to') else v for k, v in inputs.items()}
             import torch
             with torch.no_grad():
                 generated_ids = model.generate(**inputs, max_new_tokens=512, temperature=0.1)
             gen = [out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs["input_ids"], generated_ids)]
-            text = processor.batch_decode(gen, skip_special_tokens=True)[0]
+            text = processor.batch_decode(gen, skip_special_tokens=True)[0] if gen else ""
+            if not text:
+                text = processor.decode(generated_ids[0], skip_special_tokens=True)
             return {"text": text, "confidence": 0.95}
         except ImportError:
             return {"text": "", "confidence": 0.0, "error": "A-Vision: pip install qwen-vl-utils"}
         except Exception as e:
-            return {"text": "", "confidence": 0.0, "error": str(e)}
+            err = str(e)
+            if "does not support image input" in err:
+                err = "A-Vision: модель не поддерживает изображения (проверьте версию transformers)"
+            return {"text": "", "confidence": 0.0, "error": err}
