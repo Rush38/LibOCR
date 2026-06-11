@@ -47,6 +47,12 @@
     "gotocr": {
       "enabled": true,
       "gpu": true
+    },
+    "avision": {
+      "enabled": true,
+      "model_name": "AvitoTech/avision",
+      "device": "auto",
+      "load_in_8bit": true
     }
   },
   "pdf": {

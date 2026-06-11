@@ -46,10 +46,11 @@ class PostProcessor:
         surya_text = ocr_result.get("suryaocr_text", "")
         doctr_text = ocr_result.get("doctr_text", "")
         gotocr_text = ocr_result.get("gotocr_text", "")
+        avision_text = ocr_result.get("avision_text", "")
 
-        raw_text = f"{tess_text}\n---\n{easy_text}\n---\n{trocr_text}\n---\n{glm_text}\n---\n{paddle_text}\n---\n{surya_text}\n---\n{doctr_text}\n---\n{gotocr_text}"
+        raw_text = f"{tess_text}\n---\n{easy_text}\n---\n{trocr_text}\n---\n{glm_text}\n---\n{paddle_text}\n---\n{surya_text}\n---\n{doctr_text}\n---\n{gotocr_text}\n---\n{avision_text}"
 
-        combined = f"{easy_text} {tess_text} {trocr_text} {glm_text} {paddle_text} {surya_text} {doctr_text} {gotocr_text}"
+        combined = f"{easy_text} {tess_text} {trocr_text} {glm_text} {paddle_text} {surya_text} {doctr_text} {gotocr_text} {avision_text}"
 
         reader_names, possible_readers = self._extract_readers(combined)
         dates, possible_dates = self._extract_dates(raw_text)
@@ -132,6 +133,7 @@ class PostProcessor:
                 "suryaocr_text": surya_text,
                 "doctr_text": doctr_text,
                 "gotocr_text": gotocr_text,
+                "avision_text": avision_text,
             },
             "confidence": {
                 "overall": float(ocr_result.get("overall_conf", 0.0)),
@@ -143,6 +145,7 @@ class PostProcessor:
                 "suryaocr": float(ocr_result.get("suryaocr_conf", 0.0)),
                 "doctr": float(ocr_result.get("doctr_conf", 0.0)),
                 "gotocr": float(ocr_result.get("gotocr_conf", 0.0)),
+                "avision": float(ocr_result.get("avision_conf", 0.0)),
             },
             "warnings": ocr_result.get("warnings", []),
             "language": language,
