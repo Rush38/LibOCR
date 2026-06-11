@@ -99,6 +99,11 @@ def parse_arguments():
         choices=["ru", "en"],
         help="Язык интерфейса: ru (русский, по умолч.) или en (English)",
     )
+    parser.add_argument(
+        "--llm",
+        action="store_true",
+        help="Использовать LLM для коррекции OCR (нужна видеопамять 4GB+)",
+    )
     return parser.parse_args()
 
 
@@ -116,6 +121,7 @@ def process_single_image(
     max_retries=3,
     retry_delay=2,
     output_format="txt",
+    llm_corrector=None,
 ):
     filename = img_path.name
     is_pdf = img_path.suffix.lower() == ".pdf"
@@ -202,6 +208,17 @@ def process_single_image(
                 metadata,
                 time.time() - start_time,
             )
+
+            if llm_corrector and hasattr(llm_corrector, '_loaded') and llm_corrector._loaded:
+                raw = result_data.get("raw_text", "")
+                best = result_data.get("best_engine", {}).get("name", "unknown")
+                conf = result_data.get("confidence", {}).get("overall", 0)
+                if conf < 0.7 or len(raw) < 100:
+                    corrected = llm_corrector.correct_text(raw, engine_name=best, confidence=conf)
+                    if corrected and corrected != raw:
+                        result_data["raw_text"] = corrected
+                        result_data["formatted_text"] = corrected
+                        result_data["warnings"].append("LLM: текст скорректирован")
 
             json_path = output_dir / f"{img_path.stem}.json"
             base_path = output_dir / img_path.stem
@@ -519,6 +536,21 @@ def main():
     except Exception as e:
         logger.warning(f"LanguageModelCorrector: not loaded ({e})")
 
+    llm_corr = None
+    if args.llm:
+        try:
+            from llm_corrector import LLMCorrector
+            logger.info("Initializing LLM corrector...")
+            llm_corr = LLMCorrector()
+            if llm_corr.load():
+                logger.info("LLM corrector: loaded")
+            else:
+                logger.warning("LLM corrector: failed to load")
+                llm_corr = None
+        except Exception as e:
+            logger.warning(f"LLM corrector: initialization failed ({e})")
+            llm_corr = None
+
     results = []
 
     total_start = time.time()
@@ -541,6 +573,7 @@ def main():
                         input_dir, output_dir, debug_dir, logger, config,
                         debug_mode=args.debug, max_retries=max_retries,
                         retry_delay=retry_delay, output_format=output_format,
+                        llm_corrector=llm_corr,
                     )
                     futures[future] = img_path
                 for future in as_completed(futures):
@@ -559,20 +592,21 @@ def main():
         else:
             for img_path in images:
                 result = process_single_image(
-                img_path,
-                image_processor,
-                ocr_engine,
-                post_processor,
-                input_dir,
-                output_dir,
-                debug_dir,
-                logger,
-                config,
-                debug_mode=args.debug,
-                max_retries=max_retries,
-                retry_delay=retry_delay,
-                output_format=output_format,
-            )
+                    img_path,
+                    image_processor,
+                    ocr_engine,
+                    post_processor,
+                    input_dir,
+                    output_dir,
+                    debug_dir,
+                    logger,
+                    config,
+                    debug_mode=args.debug,
+                    max_retries=max_retries,
+                    retry_delay=retry_delay,
+                    output_format=output_format,
+                    llm_corrector=llm_corr,
+                )
             results.append(result)
             if result["status"] == "OK":
                 batch_state.mark_completed(img_path)
