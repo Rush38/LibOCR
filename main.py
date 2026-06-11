@@ -155,6 +155,7 @@ def process_single_image(
                     )
 
             ocr_parts = []
+            print_colored(f"  [OCR] Запуск 7 движков параллельно...", Colors.BLUE)
             for block in blocks:
                 result = ocr_engine.recognize(block)
                 ocr_parts.append(result)

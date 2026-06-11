@@ -356,16 +356,15 @@ class HybridOCREngine:
                 with ThreadPoolExecutor(max_workers=7) as executor:
                     futures = {}
                     for name, runner, t_out, msg in engines_config:
-                        print(f"  [{name}] {msg}")
-                        futures[executor.submit(runner, image)] = (name, t_out)
+                        t_start = dt.datetime.now().strftime("%H:%M:%S")
+                        t_submit = tmod.time()
+                        futures[executor.submit(runner, image)] = (name, t_out, t_start, t_submit)
 
                     for future in as_completed(futures):
-                        name, t_out = futures[future]
-                        t0 = tmod.time()
-                        t_start = dt.datetime.now().strftime("%H:%M:%S")
+                        name, t_out, t_start, t_submit = futures[future]
                         try:
                             res = future.result(timeout=t_out)
-                            dur = round(tmod.time() - t0, 2)
+                            dur = round(tmod.time() - t_submit, 2)
                             engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": dur}
                             results[name] = res
                             if res.get("error"):
@@ -376,7 +375,7 @@ class HybridOCREngine:
                         except Exception as e:
                             msg = f"{name.capitalize()}: {str(e)}"
                             warnings.append(msg)
-                            engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": round(tmod.time() - t0, 2), "error": str(e)}
+                            engine_times[name] = {"start": t_start, "end": dt.datetime.now().strftime("%H:%M:%S"), "duration": round(tmod.time() - t_submit, 2), "error": str(e)}
 
         except Exception as e:
             warnings.append(f"OCR: {str(e)}")
